@@ -4,6 +4,24 @@ import { config } from '../config/env.js';
 import { db } from '../db.js';
 import { encryptToken } from '../services/encryption.js';
 
+function getRedirectUri(req: Request, configured: string | undefined, defaultPath: string): string {
+  if (configured && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
+    return configured;
+  }
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+  const host = req.get('host');
+  return `${proto}://${host}${defaultPath}`;
+}
+
+function getFrontendBaseUrl(req: Request): string {
+  if (config.frontendUrl && !config.frontendUrl.includes('localhost') && !config.frontendUrl.includes('127.0.0.1')) {
+    return config.frontendUrl.replace(/\/$/, '');
+  }
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+  const host = req.get('host');
+  return `${proto}://${host}`;
+}
+
 export class OAuthController {
   // --- Meta (Facebook & Instagram) ---
   static async startMeta(req: Request, res: Response): Promise<void> {
@@ -15,8 +33,10 @@ export class OAuthController {
       'instagram_content_publish'
     ].join(',');
 
+    const redirectUri = getRedirectUri(req, config.meta.redirectUri, '/api/oauth/meta/callback');
+
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${config.meta.appId}&redirect_uri=${encodeURIComponent(
-      config.meta.redirectUri
+      redirectUri
     )}&scope=${scopes}&response_type=code`;
 
     res.json({
@@ -28,14 +48,16 @@ export class OAuthController {
 
   static async callbackMeta(req: Request, res: Response): Promise<void> {
     const { code, error } = req.query;
+    const frontendBase = getFrontendBaseUrl(req);
+    const redirectUri = getRedirectUri(req, config.meta.redirectUri, '/api/oauth/meta/callback');
 
     if (error) {
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(String(error))}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(String(error))}`);
       return;
     }
 
     if (!code) {
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=No_code_received`);
+      res.redirect(`${frontendBase}/connect-accounts?error=No_code_received`);
       return;
     }
 
@@ -45,7 +67,7 @@ export class OAuthController {
         params: {
           client_id: config.meta.appId,
           client_secret: config.meta.appSecret,
-          redirect_uri: config.meta.redirectUri,
+          redirect_uri: redirectUri,
           code
         }
       });
@@ -84,18 +106,19 @@ export class OAuthController {
         });
       }
 
-      res.redirect(`${config.frontendUrl}/connect-accounts?success=meta_connected`);
+      res.redirect(`${frontendBase}/connect-accounts?success=meta_connected`);
     } catch (err: any) {
       console.error('Meta OAuth callback error:', err.response?.data || err.message);
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(err.message)}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.message)}`);
     }
   }
 
   // --- LinkedIn ---
   static async startLinkedIn(req: Request, res: Response): Promise<void> {
     const scopes = encodeURIComponent('w_member_social openid profile email');
+    const redirectUri = getRedirectUri(req, config.linkedin.redirectUri, '/api/oauth/linkedin/callback');
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${config.linkedin.clientId}&redirect_uri=${encodeURIComponent(
-      config.linkedin.redirectUri
+      redirectUri
     )}&scope=${scopes}&state=syncra_state`;
 
     res.json({
@@ -107,9 +130,11 @@ export class OAuthController {
 
   static async callbackLinkedIn(req: Request, res: Response): Promise<void> {
     const { code, error } = req.query;
+    const frontendBase = getFrontendBaseUrl(req);
+    const redirectUri = getRedirectUri(req, config.linkedin.redirectUri, '/api/oauth/linkedin/callback');
 
     if (error) {
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(String(error))}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(String(error))}`);
       return;
     }
 
@@ -121,7 +146,7 @@ export class OAuthController {
           code: String(code),
           client_id: config.linkedin.clientId,
           client_secret: config.linkedin.clientSecret,
-          redirect_uri: config.linkedin.redirectUri
+          redirect_uri: redirectUri
         }).toString(),
         {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -145,18 +170,19 @@ export class OAuthController {
         scopes: 'w_member_social,openid,profile'
       });
 
-      res.redirect(`${config.frontendUrl}/connect-accounts?success=linkedin_connected`);
+      res.redirect(`${frontendBase}/connect-accounts?success=linkedin_connected`);
     } catch (err: any) {
       console.error('LinkedIn OAuth callback error:', err.response?.data || err.message);
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(err.message)}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.message)}`);
     }
   }
 
   // --- Google / YouTube ---
   static async startGoogle(req: Request, res: Response): Promise<void> {
     const scope = encodeURIComponent('https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly');
+    const redirectUri = getRedirectUri(req, config.google.redirectUri, '/api/oauth/google/callback');
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.google.clientId}&redirect_uri=${encodeURIComponent(
-      config.google.redirectUri
+      redirectUri
     )}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
 
     res.json({
@@ -168,9 +194,11 @@ export class OAuthController {
 
   static async callbackGoogle(req: Request, res: Response): Promise<void> {
     const { code, error } = req.query;
+    const frontendBase = getFrontendBaseUrl(req);
+    const redirectUri = getRedirectUri(req, config.google.redirectUri, '/api/oauth/google/callback');
 
     if (error) {
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(String(error))}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(String(error))}`);
       return;
     }
 
@@ -180,7 +208,7 @@ export class OAuthController {
         client_secret: config.google.clientSecret,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: config.google.redirectUri
+        redirect_uri: redirectUri
       });
 
       const { access_token, refresh_token } = tokenRes.data;
@@ -212,18 +240,19 @@ export class OAuthController {
         scopes: 'youtube.upload'
       });
 
-      res.redirect(`${config.frontendUrl}/connect-accounts?success=youtube_connected`);
+      res.redirect(`${frontendBase}/connect-accounts?success=youtube_connected`);
     } catch (err: any) {
       console.error('Google OAuth callback error:', err.response?.data || err.message);
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(err.message)}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.message)}`);
     }
   }
 
   // --- Twitter / X ---
   static async startTwitter(req: Request, res: Response): Promise<void> {
     const scopes = encodeURIComponent('tweet.read tweet.write users.read offline.access');
+    const redirectUri = getRedirectUri(req, config.twitter.redirectUri, '/api/oauth/twitter/callback');
     const authUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${config.twitter.clientId}&redirect_uri=${encodeURIComponent(
-      config.twitter.redirectUri
+      redirectUri
     )}&scope=${scopes}&state=syncra_state&code_challenge=challenge&code_challenge_method=plain`;
 
     res.json({
@@ -235,9 +264,11 @@ export class OAuthController {
 
   static async callbackTwitter(req: Request, res: Response): Promise<void> {
     const { code, error } = req.query;
+    const frontendBase = getFrontendBaseUrl(req);
+    const redirectUri = getRedirectUri(req, config.twitter.redirectUri, '/api/oauth/twitter/callback');
 
     if (error) {
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(String(error))}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(String(error))}`);
       return;
     }
 
@@ -248,7 +279,7 @@ export class OAuthController {
         new URLSearchParams({
           code: String(code),
           grant_type: 'authorization_code',
-          redirect_uri: config.twitter.redirectUri,
+          redirect_uri: redirectUri,
           code_verifier: 'challenge'
         }).toString(),
         {
@@ -267,7 +298,7 @@ export class OAuthController {
       });
 
       const user = await db.getDefaultUser();
-      const twitterHandle = userRes.data?.data?.username ? `@${userRes.data.data.username}` : '@founderlabs';
+      const twitterHandle = userRes.data?.data?.username ? `@${userRes.data.data.username}` : '@syncra';
       const twitterId = userRes.data?.data?.id || 'tw_default';
 
       await db.saveConnectedAccount({
@@ -278,13 +309,13 @@ export class OAuthController {
         encrypted_access_token: encryptToken(access_token),
         encrypted_refresh_token: refresh_token ? encryptToken(refresh_token) : undefined,
         status: 'connected',
-        scopes: 'tweet.read,tweet.write,offline.access'
+        scopes: 'tweet.read,tweet.write,users.read'
       });
 
-      res.redirect(`${config.frontendUrl}/connect-accounts?success=twitter_connected`);
+      res.redirect(`${frontendBase}/connect-accounts?success=twitter_connected`);
     } catch (err: any) {
       console.error('Twitter OAuth callback error:', err.response?.data || err.message);
-      res.redirect(`${config.frontendUrl}/connect-accounts?error=${encodeURIComponent(err.message)}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.message)}`);
     }
   }
 
