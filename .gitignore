@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Production builds
+dist/
+*/dist/
+
+# Environment files
+.env
+*/.env
+!.env.example
+!*/.env.example
+
+# Local Uploads & Data
+uploads/*
+!uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+data/db.json
+backend/data/db.json
+
+# Logs & temp
+*.log
+npm-debug.log*
+.DS_Store
