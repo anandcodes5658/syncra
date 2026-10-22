@@ -4,10 +4,13 @@ import path from 'path';
 // Load .env from backend directory or root
 dotenv.config();
 
+const defaultBaseUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+const defaultFrontendUrl = process.env.RENDER_EXTERNAL_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
-  appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:5000',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  appBaseUrl: defaultBaseUrl,
+  frontendUrl: defaultFrontendUrl,
   databaseUrl: process.env.DATABASE_URL || '',
   encryptionKey: process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', // 32 bytes hex default
 
@@ -15,28 +18,28 @@ export const config = {
   meta: {
     appId: process.env.META_APP_ID || '',
     appSecret: process.env.META_APP_SECRET || '',
-    redirectUri: process.env.META_REDIRECT_URI || 'http://localhost:5000/api/oauth/meta/callback',
+    redirectUri: process.env.META_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/meta/callback`,
   },
 
   // OAuth LinkedIn
   linkedin: {
     clientId: process.env.LINKEDIN_CLIENT_ID || '',
     clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
-    redirectUri: process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:5000/api/oauth/linkedin/callback',
+    redirectUri: process.env.LINKEDIN_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/linkedin/callback`,
   },
 
   // OAuth Google / YouTube
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/oauth/google/callback',
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/google/callback`,
   },
 
   // OAuth Twitter / X (API v2)
   twitter: {
     clientId: process.env.TWITTER_CLIENT_ID || '',
     clientSecret: process.env.TWITTER_CLIENT_SECRET || '',
-    redirectUri: process.env.TWITTER_REDIRECT_URI || 'http://localhost:5000/api/oauth/twitter/callback',
+    redirectUri: process.env.TWITTER_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/twitter/callback`,
   },
 
   // Feature Flags

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js';
 import { config } from '../../config/env.js';
 import { decryptToken } from '../encryption.js';
+import { StorageService } from '../storage.js';
 
 export class MetaFacebookPublisher extends BasePublisher {
   platformName = 'facebook';
@@ -79,17 +80,19 @@ export class MetaFacebookPublisher extends BasePublisher {
       };
 
       if (media) {
+        const absoluteMediaUrl = StorageService.getAbsolutePublicUrl(media.file_url);
+
         if (media.file_type.startsWith('image/')) {
           apiEndpoint = `https://graph.facebook.com/v19.0/${targetPageId}/photos`;
           payload = {
-            url: media.file_url,
+            url: absoluteMediaUrl,
             caption: caption,
             access_token: pageAccessToken
           };
         } else if (media.file_type.startsWith('video/')) {
           apiEndpoint = `https://graph.facebook.com/v19.0/${targetPageId}/videos`;
           payload = {
-            file_url: media.file_url,
+            file_url: absoluteMediaUrl,
             description: caption,
             access_token: pageAccessToken
           };

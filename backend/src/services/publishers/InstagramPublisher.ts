@@ -2,6 +2,7 @@ import axios from 'axios';
 import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js';
 import { config } from '../../config/env.js';
 import { decryptToken } from '../encryption.js';
+import { StorageService } from '../storage.js';
 
 export class InstagramPublisher extends BasePublisher {
   platformName = 'instagram';
@@ -82,11 +83,13 @@ export class InstagramPublisher extends BasePublisher {
         caption: caption
       };
 
+      const absoluteMediaUrl = StorageService.getAbsolutePublicUrl(media.file_url);
+
       if (isVideo) {
         containerParams.media_type = 'REELS';
-        containerParams.video_url = media.file_url;
+        containerParams.video_url = absoluteMediaUrl;
       } else {
-        containerParams.image_url = media.file_url;
+        containerParams.image_url = absoluteMediaUrl;
       }
 
       const createRes = await axios.post(`https://graph.facebook.com/v19.0/${igUserId}/media`, null, {
