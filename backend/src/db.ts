@@ -132,17 +132,52 @@ class DatabaseManager {
     } catch (err) {
       console.error('Error saving db.json:', err);
     }
+
+    if (this.isPostgres && this.pgPool) {
+      this.pgPool.query(
+        `INSERT INTO syncra_store (key, data, updated_at) VALUES ('main', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = NOW();`,
+        [JSON.stringify(this.memoryStore)]
+      ).catch((err: Error) => {
+        console.error('Error persisting to PostgreSQL:', err.message);
+      });
+    }
   }
 
   async init(): Promise<void> {
     if (config.databaseUrl) {
       try {
-        this.pgPool = new pg.Pool({ connectionString: config.databaseUrl });
+        const isSsl = !config.databaseUrl.includes('localhost') && !config.databaseUrl.includes('127.0.0.1');
+        this.pgPool = new pg.Pool({
+          connectionString: config.databaseUrl,
+          ssl: isSsl ? { rejectUnauthorized: false } : false
+        });
         const client = await this.pgPool.connect();
         this.isPostgres = true;
         console.log('Connected to PostgreSQL successfully.');
+
+        // Ensure table exists
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS syncra_store (
+            key VARCHAR(64) PRIMARY KEY,
+            data JSONB NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        // Load persisted state from PostgreSQL if available
+        const res = await client.query(`SELECT data FROM syncra_store WHERE key = 'main' LIMIT 1;`);
+        if (res.rows.length > 0 && res.rows[0].data) {
+          this.memoryStore = { ...this.memoryStore, ...res.rows[0].data };
+          console.log('Synchronized state with PostgreSQL database.');
+        } else {
+          await client.query(
+            `INSERT INTO syncra_store (key, data, updated_at) VALUES ('main', $1, NOW())
+             ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = NOW();`,
+            [JSON.stringify(this.memoryStore)]
+          );
+        }
         client.release();
-        return;
       } catch (err) {
         console.warn('PostgreSQL connection failed, falling back to JSON persistence:', (err as Error).message);
         this.isPostgres = false;
