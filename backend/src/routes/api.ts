@@ -59,6 +59,27 @@ router.get('/audit-logs', async (req, res) => {
   }
 });
 
+// Database Inspection
+router.get('/database/inspect', async (req, res) => {
+  try {
+    const raw = await db.getRawStore();
+    res.json({
+      success: true,
+      engine: db.isUsingPostgres() ? 'PostgreSQL' : 'JSON File Store',
+      counts: {
+        accounts: raw.connected_accounts.length,
+        posts: raw.post_drafts.length,
+        targets: raw.post_targets.length,
+        jobs: raw.publish_jobs.length,
+        logs: raw.audit_logs.length
+      },
+      data: raw
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health & System Info
 router.get('/health', (req, res) => {
   res.json({

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -8,12 +8,45 @@ import {
   Save,
   Globe,
   Sliders,
-  FileText
+  FileText,
+  Database,
+  RefreshCw,
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Database Inspector state
+  const [dbInfo, setDbInfo] = useState<{
+    engine: string;
+    counts: { accounts: number; posts: number; targets: number; jobs: number; logs: number };
+    data: any;
+  } | null>(null);
+  const [loadingDb, setLoadingDb] = useState(false);
+  const [showRawDb, setShowRawDb] = useState(false);
+
+  const fetchDbInfo = async () => {
+    try {
+      setLoadingDb(true);
+      const res = await fetch('/api/database/inspect');
+      if (res.ok) {
+        const json = await res.json();
+        setDbInfo(json);
+      }
+    } catch (err) {
+      console.error('Failed to inspect database:', err);
+    } finally {
+      setLoadingDb(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDbInfo();
+  }, []);
 
   // Settings state
   const [privacyUrl, setPrivacyUrl] = useState('https://syncra.io/privacy');
@@ -165,6 +198,93 @@ export const SettingsPage: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Database & Persistence Inspector */}
+      <div className="bg-[#0a0a0a] border border-neutral-800 rounded-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-semibold text-white">Database & Storage Inspector</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-mono border ${
+              dbInfo?.engine === 'PostgreSQL'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : 'bg-neutral-800 text-neutral-300 border-neutral-700'
+            }`}>
+              Engine: {dbInfo?.engine || 'Detecting...'}
+            </span>
+            <button
+              onClick={fetchDbInfo}
+              disabled={loadingDb}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-neutral-300 hover:text-white bg-neutral-900 border border-neutral-800 rounded-lg hover:border-neutral-700 transition"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingDb ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Database Stats Counters */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3 bg-neutral-900/60 border border-neutral-800/80 rounded-xl">
+            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Posts</p>
+            <p className="text-lg font-bold text-white mt-0.5">{dbInfo?.counts.posts ?? 0}</p>
+          </div>
+          <div className="p-3 bg-neutral-900/60 border border-neutral-800/80 rounded-xl">
+            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Accounts</p>
+            <p className="text-lg font-bold text-white mt-0.5">{dbInfo?.counts.accounts ?? 0}</p>
+          </div>
+          <div className="p-3 bg-neutral-900/60 border border-neutral-800/80 rounded-xl">
+            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Platform Targets</p>
+            <p className="text-lg font-bold text-white mt-0.5">{dbInfo?.counts.targets ?? 0}</p>
+          </div>
+          <div className="p-3 bg-neutral-900/60 border border-neutral-800/80 rounded-xl">
+            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Queue Jobs</p>
+            <p className="text-lg font-bold text-white mt-0.5">{dbInfo?.counts.jobs ?? 0}</p>
+          </div>
+          <div className="p-3 bg-neutral-900/60 border border-neutral-800/80 rounded-xl col-span-2 sm:col-span-1">
+            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Audit Logs</p>
+            <p className="text-lg font-bold text-white mt-0.5">{dbInfo?.counts.logs ?? 0}</p>
+          </div>
+        </div>
+
+        {/* Raw Data Toggle */}
+        <div className="space-y-3">
+          <button
+            onClick={() => setShowRawDb(!showRawDb)}
+            className="flex items-center justify-between w-full px-4 py-2.5 bg-neutral-900/70 border border-neutral-800 rounded-xl text-xs text-neutral-300 hover:text-white hover:border-neutral-700 transition"
+          >
+            <span className="flex items-center gap-2">
+              <Eye className="w-3.5 h-3.5 text-neutral-400" />
+              {showRawDb ? 'Hide Live Database Records (JSON)' : 'View Live Database Records (JSON)'}
+            </span>
+            {showRawDb ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {showRawDb && (
+            <div className="relative">
+              <pre className="p-4 bg-black border border-neutral-800 rounded-xl text-[11px] font-mono text-neutral-300 max-h-72 overflow-auto leading-relaxed">
+                {JSON.stringify(dbInfo?.data || {}, null, 2)}
+              </pre>
+              <button
+                onClick={() => handleCopy('raw_db', JSON.stringify(dbInfo?.data || {}, null, 2))}
+                className="absolute top-3 right-3 px-2 py-1 text-[10px] bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded flex items-center gap-1 transition"
+              >
+                {copiedKey === 'raw_db' ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" /> Copy JSON
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

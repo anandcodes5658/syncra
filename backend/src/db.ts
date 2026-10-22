@@ -362,6 +362,14 @@ class DatabaseManager {
       .slice(-limit)
       .reverse();
   }
+
+  isUsingPostgres(): boolean {
+    return this.isPostgres;
+  }
+
+  async getRawStore(): Promise<DataStore> {
+    return this.memoryStore;
+  }
 }
 
 export const db = new DatabaseManager();
