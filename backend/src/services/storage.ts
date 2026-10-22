@@ -18,14 +18,23 @@ export interface StoredFile {
 
 export class StorageService {
   /**
-   * Generates a publicly accessible URL for a given local file
+   * Generates a relative public URL for web previews and direct browser requests
    */
   static getPublicUrl(filename: string): string {
     if (config.storage.provider === 'local') {
-      return `${config.appBaseUrl}/uploads/${filename}`;
+      return `/uploads/${filename}`;
     }
     // If S3 / R2 configured:
     return `https://${config.storage.bucket}.s3.amazonaws.com/${filename}`;
+  }
+
+  /**
+   * Generates an absolute public HTTPS URL for external social media APIs (Meta, YouTube, etc.)
+   */
+  static getAbsolutePublicUrl(filenameOrPath: string): string {
+    const filename = filenameOrPath.replace(/^\/uploads\//, '').replace(/^.*\/uploads\//, '');
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || config.appBaseUrl || 'https://syncra.io';
+    return `${baseUrl.replace(/\/$/, '')}/uploads/${filename}`;
   }
 
   /**

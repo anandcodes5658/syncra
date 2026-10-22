@@ -13,6 +13,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { RawResponseModal } from '../components/RawResponseModal';
 import { PostDraftStatusResponse, TargetStatus, PlatformType } from '../types';
 import { getPostStatus, retryJob, getPosts } from '../services/api';
+import { normalizeMediaUrl } from '../utils/media';
 
 interface Props {
   activeDraftId: string | null;
@@ -145,9 +146,9 @@ export const LiveStatusPage: React.FC<Props> = ({ activeDraftId, onSelectDraft, 
               {statusData.media && (
                 <div className="w-16 h-16 bg-neutral-900 rounded-xl overflow-hidden shrink-0 border border-neutral-800">
                   {statusData.media.file_type.startsWith('video/') ? (
-                    <video src={statusData.media.file_url} className="w-full h-full object-cover" />
+                    <video src={normalizeMediaUrl(statusData.media.file_url)} className="w-full h-full object-cover" />
                   ) : (
-                    <img src={statusData.media.file_url} alt="Post asset" className="w-full h-full object-cover" />
+                    <img src={normalizeMediaUrl(statusData.media.file_url)} alt="Post asset" className="w-full h-full object-cover" />
                   )}
                 </div>
               )}

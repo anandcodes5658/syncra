@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal } from 'lucide-react';
 import { MediaAsset } from '../../types';
+import { normalizeMediaUrl } from '../../utils/media';
 
 interface Props {
   caption: string;
@@ -41,9 +42,9 @@ export const InstagramPreview: React.FC<Props> = ({
         <div className="relative aspect-square w-full bg-neutral-950 flex items-center justify-center overflow-hidden border-y border-neutral-900">
           {media ? (
             media.file_type.startsWith('video/') ? (
-              <video src={media.file_url} className="w-full h-full object-cover" controls playsInline />
+              <video src={normalizeMediaUrl(media.file_url)} className="w-full h-full object-cover" controls playsInline />
             ) : (
-              <img src={media.file_url} alt="Instagram preview" className="w-full h-full object-cover" />
+              <img src={normalizeMediaUrl(media.file_url)} alt="Instagram preview" className="w-full h-full object-cover" />
             )
           ) : (
             <div className="text-center p-6 text-neutral-600 text-xs">

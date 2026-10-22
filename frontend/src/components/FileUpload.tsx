@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { UploadCloud, File, Trash2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { uploadMedia } from '../services/api';
 import { MediaAsset } from '../types';
+import { normalizeMediaUrl } from '../utils/media';
 
 interface Props {
   media: MediaAsset | null;
@@ -63,9 +64,9 @@ export const FileUpload: React.FC<Props> = ({ media, onMediaUploaded }) => {
           {/* Thumbnail preview */}
           <div className="w-full md:w-36 h-28 bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-neutral-800">
             {media.file_type.startsWith('video/') ? (
-              <video src={media.file_url} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+              <video src={normalizeMediaUrl(media.file_url)} className="w-full h-full object-cover" muted autoPlay loop playsInline />
             ) : (
-              <img src={media.file_url} alt="Uploaded Media" className="w-full h-full object-cover" />
+              <img src={normalizeMediaUrl(media.file_url)} alt="Uploaded Media" className="w-full h-full object-cover" />
             )}
           </div>
 

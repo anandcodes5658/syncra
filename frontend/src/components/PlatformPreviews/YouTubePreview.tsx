@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Eye, MoreVertical, Bell, ThumbsUp, ThumbsDown, Share } from 'lucide-react';
 import { MediaAsset } from '../../types';
+import { normalizeMediaUrl } from '../../utils/media';
 
 interface Props {
   title: string;
@@ -34,7 +35,7 @@ export const YouTubePreview: React.FC<Props> = ({
         {/* Video Player Mock */}
         <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden border-b border-neutral-800">
           {media && media.file_type.startsWith('video/') ? (
-            <video src={media.file_url} className="w-full h-full object-cover" controls playsInline />
+            <video src={normalizeMediaUrl(media.file_url)} className="w-full h-full object-cover" controls playsInline />
           ) : (
             <div className="flex flex-col items-center justify-center text-center p-6 text-neutral-500">
               <div className="w-14 h-14 rounded-full bg-red-600/90 text-white flex items-center justify-center mb-2 shadow-lg">

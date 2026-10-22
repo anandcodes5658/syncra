@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, Repeat2, MessageCircle, Bookmark, Share, BadgeCheck, AlertCircle } from 'lucide-react';
 import { MediaAsset } from '../../types';
+import { normalizeMediaUrl } from '../../utils/media';
 
 interface Props {
   text: string;
@@ -58,9 +59,9 @@ export const TwitterPreview: React.FC<Props> = ({
         {media && (
           <div className="relative w-full max-h-72 bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800">
             {media.file_type.startsWith('video/') ? (
-              <video src={media.file_url} className="w-full h-full object-cover max-h-72" controls playsInline />
+              <video src={normalizeMediaUrl(media.file_url)} className="w-full h-full object-cover max-h-72" controls playsInline />
             ) : (
-              <img src={media.file_url} alt="X media attachment" className="w-full h-full object-cover max-h-72" />
+              <img src={normalizeMediaUrl(media.file_url)} alt="X media attachment" className="w-full h-full object-cover max-h-72" />
             )}
           </div>
         )}

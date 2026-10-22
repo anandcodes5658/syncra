@@ -1,6 +1,7 @@
 import React from 'react';
 import { ThumbsUp, MessageSquare, Repeat2, Send, Globe, MoreHorizontal } from 'lucide-react';
 import { MediaAsset } from '../../types';
+import { normalizeMediaUrl } from '../../utils/media';
 
 interface Props {
   commentary: string;
@@ -59,9 +60,9 @@ export const LinkedInPreview: React.FC<Props> = ({
         {media && (
           <div className="relative w-full max-h-80 bg-black flex items-center justify-center overflow-hidden border-y border-neutral-800">
             {media.file_type.startsWith('video/') ? (
-              <video src={media.file_url} className="w-full h-full object-cover max-h-80" controls playsInline />
+              <video src={normalizeMediaUrl(media.file_url)} className="w-full h-full object-cover max-h-80" controls playsInline />
             ) : (
-              <img src={media.file_url} alt="LinkedIn media" className="w-full h-full object-cover max-h-80" />
+              <img src={normalizeMediaUrl(media.file_url)} alt="LinkedIn media" className="w-full h-full object-cover max-h-80" />
             )}
           </div>
         )}

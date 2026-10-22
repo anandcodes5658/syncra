@@ -15,6 +15,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { RawResponseModal } from '../components/RawResponseModal';
 import { PostItem, PlatformType } from '../types';
 import { getPosts, retryJob } from '../services/api';
+import { normalizeMediaUrl } from '../utils/media';
 
 interface Props {
   onSelectDraft: (draftId: string) => void;
@@ -148,9 +149,9 @@ export const PostHistoryPage: React.FC<Props> = ({ onSelectDraft }) => {
                   {post.media && (
                     <div className="w-12 h-12 bg-neutral-900 rounded-xl overflow-hidden shrink-0 border border-neutral-800">
                       {post.media.file_type.startsWith('video/') ? (
-                        <video src={post.media.file_url} className="w-full h-full object-cover" />
+                        <video src={normalizeMediaUrl(post.media.file_url)} className="w-full h-full object-cover" />
                       ) : (
-                        <img src={post.media.file_url} alt="Media thumbnail" className="w-full h-full object-cover" />
+                        <img src={normalizeMediaUrl(post.media.file_url)} alt="Media thumbnail" className="w-full h-full object-cover" />
                       )}
                     </div>
                   )}
