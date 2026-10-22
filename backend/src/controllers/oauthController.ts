@@ -74,36 +74,68 @@ export class OAuthController {
 
       const accessToken = tokenRes.data.access_token;
 
-      // Fetch user profile & pages
+      // Fetch user profile
       const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${accessToken}`);
       const user = await db.getDefaultUser();
 
-      // Store Facebook account
-      await db.saveConnectedAccount({
-        user_id: user.id,
-        platform: 'facebook',
-        account_name: meRes.data.name || 'Facebook Page',
-        external_account_id: meRes.data.id,
-        encrypted_access_token: encryptToken(accessToken),
-        status: 'connected',
-        scopes: 'pages_manage_posts,pages_show_list'
-      });
+      // Fetch Facebook Pages managed by user
+      let pages: any[] = [];
+      try {
+        const accountsRes = await axios.get(
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${accessToken}`
+        );
+        pages = accountsRes.data.data || [];
+        console.log(`Discovered ${pages.length} Meta Facebook Pages for user ${meRes.data.name}`);
+      } catch (err: any) {
+        console.warn('Failed to fetch /me/accounts from Meta:', err.response?.data || err.message);
+      }
 
-      // Fetch Instagram Business accounts linked to user's pages
-      const accountsRes = await axios.get(`https://graph.facebook.com/v19.0/me/accounts?fields=name,instagram_business_account&access_token=${accessToken}`);
-      const pages = accountsRes.data.data || [];
-      const igPage = pages.find((p: any) => p.instagram_business_account?.id);
-
-      if (igPage) {
+      // Store Facebook Page (prefer real Page with Page Access Token)
+      if (pages.length > 0) {
+        const primaryPage = pages[0];
         await db.saveConnectedAccount({
           user_id: user.id,
-          platform: 'instagram',
-          account_name: `${igPage.name} (IG)`,
-          external_account_id: igPage.instagram_business_account.id,
+          platform: 'facebook',
+          account_name: primaryPage.name || 'Facebook Page',
+          external_account_id: primaryPage.id,
+          encrypted_access_token: encryptToken(primaryPage.access_token || accessToken),
+          status: 'connected',
+          scopes: 'pages_manage_posts,pages_read_engagement,pages_show_list'
+        });
+      } else {
+        await db.saveConnectedAccount({
+          user_id: user.id,
+          platform: 'facebook',
+          account_name: meRes.data.name || 'Facebook Page',
+          external_account_id: meRes.data.id,
           encrypted_access_token: encryptToken(accessToken),
           status: 'connected',
-          scopes: 'instagram_content_publish'
+          scopes: 'pages_manage_posts,pages_show_list'
         });
+      }
+
+      // Check for connected Instagram Business accounts linked to user's pages
+      let foundIg = false;
+      for (const p of pages) {
+        if (p.instagram_business_account?.id) {
+          foundIg = true;
+          const igId = p.instagram_business_account.id;
+          const igUsername = p.instagram_business_account.username || p.name;
+          await db.saveConnectedAccount({
+            user_id: user.id,
+            platform: 'instagram',
+            account_name: `@${igUsername}`,
+            external_account_id: igId,
+            encrypted_access_token: encryptToken(p.access_token || accessToken),
+            status: 'connected',
+            scopes: 'instagram_content_publish,instagram_basic'
+          });
+          break;
+        }
+      }
+
+      if (!foundIg) {
+        console.log('No linked Instagram Business account found on discovered Facebook pages.');
       }
 
       res.redirect(`${frontendBase}/connect-accounts?success=meta_connected`);

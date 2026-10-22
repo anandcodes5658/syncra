@@ -63,15 +63,22 @@ export class MetaFacebookPublisher extends BasePublisher {
       };
     }
 
-    const userToken = decryptToken(account.encrypted_access_token);
-    const pageId = account.external_account_id;
+    const storedToken = decryptToken(account.encrypted_access_token);
+    let targetPageId = account.external_account_id;
+    let pageAccessToken = storedToken;
 
     try {
-      // 1. Fetch Page Access Token using user token
-      const accountsRes = await axios.get(`https://graph.facebook.com/v19.0/me/accounts?access_token=${userToken}`);
-      const pageData = accountsRes.data.data?.find((p: any) => p.id === pageId) || accountsRes.data.data?.[0];
-      const pageAccessToken = pageData?.access_token || userToken;
-      const targetPageId = pageData?.id || pageId;
+      // 1. If stored token is a User token, resolve the specific Page Access Token and Page ID
+      try {
+        const accountsRes = await axios.get(`https://graph.facebook.com/v19.0/me/accounts?access_token=${storedToken}`);
+        const pageData = accountsRes.data.data?.find((p: any) => p.id === targetPageId) || accountsRes.data.data?.[0];
+        if (pageData) {
+          pageAccessToken = pageData.access_token || storedToken;
+          targetPageId = pageData.id || targetPageId;
+        }
+      } catch (e) {
+        // Token is already a direct Page Access Token
+      }
 
       let apiEndpoint = `https://graph.facebook.com/v19.0/${targetPageId}/feed`;
       let payload: Record<string, any> = {
