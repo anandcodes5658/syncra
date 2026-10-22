@@ -163,6 +163,47 @@ class DatabaseManager {
             data JSONB NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
+
+          -- Relational Views for visual SQL tools (TablePlus, DBeaver, pgAdmin)
+          CREATE OR REPLACE VIEW view_posts AS
+          SELECT 
+            d->>'id' AS id,
+            d->>'title' AS title,
+            d->>'master_caption' AS master_caption,
+            d->>'status' AS status,
+            d->>'created_at' AS created_at
+          FROM syncra_store,
+          LATERAL jsonb_array_elements(COALESCE(data->'post_drafts', '[]'::jsonb)) AS d;
+
+          CREATE OR REPLACE VIEW view_connected_accounts AS
+          SELECT 
+            a->>'id' AS id,
+            a->>'platform' AS platform,
+            a->>'account_name' AS account_name,
+            a->>'status' AS status
+          FROM syncra_store,
+          LATERAL jsonb_array_elements(COALESCE(data->'connected_accounts', '[]'::jsonb)) AS a;
+
+          CREATE OR REPLACE VIEW view_queue_jobs AS
+          SELECT 
+            j->>'id' AS id,
+            j->>'post_target_id' AS post_target_id,
+            j->>'job_status' AS job_status,
+            (j->>'attempts')::int AS attempts,
+            j->>'last_error' AS last_error,
+            j->>'external_url' AS proof_url,
+            j->>'updated_at' AS updated_at
+          FROM syncra_store,
+          LATERAL jsonb_array_elements(COALESCE(data->'publish_jobs', '[]'::jsonb)) AS j;
+
+          CREATE OR REPLACE VIEW view_audit_logs AS
+          SELECT 
+            l->>'id' AS id,
+            l->>'action' AS action,
+            l->>'platform' AS platform,
+            l->>'created_at' AS created_at
+          FROM syncra_store,
+          LATERAL jsonb_array_elements(COALESCE(data->'audit_logs', '[]'::jsonb)) AS l;
         `);
 
         // Load persisted state from PostgreSQL if available
