@@ -29,6 +29,7 @@ export class OAuthController {
       'pages_show_list',
       'pages_read_engagement',
       'pages_manage_posts',
+      'business_management',
       'instagram_basic',
       'instagram_content_publish'
     ].join(',');
@@ -79,35 +80,91 @@ export class OAuthController {
       const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${accessToken}`);
       const user = await db.getDefaultUser();
 
-      // Fetch Facebook Pages managed by user
+      // Fetch Facebook Pages managed by user (Tier 1: /me/accounts)
       let pages: any[] = [];
+      let accountsDebug: any = null;
       try {
         const accountsRes = await axios.get(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${accessToken}`
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,category,instagram_business_account{id,username,name}&access_token=${accessToken}`
         );
+        accountsDebug = accountsRes.data;
         pages = accountsRes.data.data || [];
         console.log(`Discovered ${pages.length} Meta Facebook Pages for user ${meRes.data.name}`);
       } catch (err: any) {
         console.warn('Failed to fetch /me/accounts from Meta:', err.response?.data || err.message);
       }
 
-      // Check New Page Experience (NPE) context where /me might directly be the Page
+      // Tier 2: Check Business Portfolio Owned & Client Pages (/me/businesses)
+      if (pages.length === 0) {
+        try {
+          const busRes = await axios.get(
+            `https://graph.facebook.com/v19.0/me/businesses?fields=id,name,client_pages{id,name,access_token,instagram_business_account{id,username,name}},owned_pages{id,name,access_token,instagram_business_account{id,username,name}}&access_token=${accessToken}`
+          );
+          if (busRes.data?.data) {
+            for (const b of busRes.data.data) {
+              const owned = b.owned_pages?.data || [];
+              const client = b.client_pages?.data || [];
+              pages.push(...owned, ...client);
+            }
+            if (pages.length > 0) {
+              console.log(`Discovered ${pages.length} Pages through Meta Business Portfolio`);
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Tier 3: Check New Page Experience (NPE) context where /me might directly be the Page
+      let directPageData: any = null;
       if (pages.length === 0) {
         try {
           const directPageRes = await axios.get(
-            `https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username,name}&access_token=${accessToken}`
+            `https://graph.facebook.com/v19.0/me?fields=id,name,category,instagram_business_account{id,username,name}&access_token=${accessToken}`
           );
-          if (directPageRes.data?.instagram_business_account) {
-            console.log('User logged in with Page profile context in NPE:', directPageRes.data);
+          directPageData = directPageRes.data;
+          // If category exists or name matches, user authorized directly in Page profile context
+          if (directPageData?.category || directPageData?.instagram_business_account) {
+            console.log('User logged in with Page profile context in NPE:', directPageData);
             pages.push({
-              id: directPageRes.data.id,
-              name: directPageRes.data.name,
+              id: directPageData.id,
+              name: directPageData.name,
               access_token: accessToken,
-              instagram_business_account: directPageRes.data.instagram_business_account
+              instagram_business_account: directPageData.instagram_business_account
             });
           }
         } catch (e) {
           // ignore
+        }
+      }
+
+      // Save debug audit log so we can inspect Meta's exact payload
+      await db.createAuditLog({
+        action: 'META_AUTH_DEBUG',
+        user_id: user.id,
+        platform: 'facebook',
+        metadata_json: {
+          me: meRes.data,
+          accountsDebug,
+          directPageData,
+          pagesFound: pages.length
+        }
+      });
+
+      // Fetch instagram_business_account for discovered pages if not already expanded
+      for (const p of pages) {
+        if (!p.instagram_business_account && p.access_token) {
+          try {
+            const igRes = await axios.get(
+              `https://graph.facebook.com/v19.0/${p.id}?fields=instagram_business_account{id,username,name}&access_token=${p.access_token}`
+            );
+            if (igRes.data?.instagram_business_account) {
+              p.instagram_business_account = igRes.data.instagram_business_account;
+              console.log(`Discovered Instagram account via Page graph query: ${igRes.data.instagram_business_account.username}`);
+            }
+          } catch (e) {
+            // ignore
+          }
         }
       }
 
