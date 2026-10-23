@@ -203,9 +203,11 @@ export const PostHistoryPage: React.FC<Props> = ({ onSelectDraft }) => {
                             href={job.external_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1 text-[11px] text-white hover:underline truncate"
+                            className={`flex items-center gap-1 text-[11px] truncate hover:underline ${
+                              job.external_url.includes('intent/tweet') ? 'text-sky-400 font-medium' : 'text-white'
+                            }`}
                           >
-                            <span>Live Proof</span>
+                            <span>{job.external_url.includes('intent/tweet') ? 'Post to X ↗' : 'Live Proof'}</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}

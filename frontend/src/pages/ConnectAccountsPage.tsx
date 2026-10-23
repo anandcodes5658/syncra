@@ -80,8 +80,8 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
     {
       id: 'twitter',
       name: 'X (formerly Twitter)',
-      description: 'Post updates, commentary, and media via official X API v2 (POST /2/tweets)',
-      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+      description: 'Official API v2 + Free 1-Click Web Intent bridge (zero fees, direct publishing)',
+      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'],
       gradient: 'from-neutral-700 to-black',
       authStartEndpoint: '/api/oauth/twitter/start'
     }

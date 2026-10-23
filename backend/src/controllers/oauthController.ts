@@ -358,7 +358,7 @@ export class OAuthController {
 
   // --- Twitter / X ---
   static async startTwitter(req: Request, res: Response): Promise<void> {
-    const scopes = encodeURIComponent('tweet.read tweet.write users.read offline.access');
+    const scopes = encodeURIComponent('tweet.read tweet.write users.read offline.access media.write');
     const redirectUri = getRedirectUri(req, config.twitter.redirectUri, '/api/oauth/twitter/callback');
     // RFC 7636 requires code_verifier to be between 43 and 128 characters
     const verifier = 'syncra_oauth2_pkce_challenge_verifier_secret_key_2026_x';
@@ -433,7 +433,7 @@ export class OAuthController {
         encrypted_access_token: encryptToken(access_token),
         encrypted_refresh_token: refresh_token ? encryptToken(refresh_token) : undefined,
         status: 'connected',
-        scopes: 'tweet.read,tweet.write,users.read'
+        scopes: 'tweet.read,tweet.write,users.read,media.write'
       });
 
       res.redirect(`${frontendBase}/connect-accounts?success=twitter_connected`);

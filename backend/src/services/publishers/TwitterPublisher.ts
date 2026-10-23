@@ -3,6 +3,7 @@ import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js
 import { config } from '../../config/env.js';
 import { decryptToken, encryptToken } from '../encryption.js';
 import { db } from '../../db.js';
+import { StorageService } from '../storage.js';
 
 export class TwitterPublisher extends BasePublisher {
   platformName = 'twitter';
@@ -14,8 +15,41 @@ export class TwitterPublisher extends BasePublisher {
     if (config.features.enableTwitterReal) {
       return this.publishReal(tweetText, media, account);
     } else {
-      return this.publishMock(tweetText, media, account);
+      // Default to Free 1-Click Web Intent bridge
+      return this.publishWebIntent(tweetText, media, account);
     }
+  }
+
+  /**
+   * Free 1-Click Twitter Web Intent Flow (Zero API Credits, 100% Free & Official)
+   */
+  private publishWebIntent(tweetText: string, media?: any, account?: any, reason?: string): PublishResult {
+    const handle = account?.account_name?.replace('@', '') || 'syncra__ai';
+    const params = new URLSearchParams();
+    params.set('text', tweetText);
+
+    if (media?.file_url) {
+      const publicUrl = StorageService.getAbsolutePublicUrl(media.file_url);
+      params.set('url', publicUrl);
+    }
+
+    const intentUrl = `https://twitter.com/intent/tweet?${params.toString()}`;
+
+    return {
+      success: true,
+      externalPostId: `intent_${Date.now()}`,
+      externalUrl: intentUrl,
+      rawResponse: {
+        mode: 'web_intent',
+        platform: 'twitter',
+        author: handle,
+        intentUrl,
+        text: tweetText,
+        has_media: !!media,
+        reason: reason || '1-Click Free Web Intent bridge',
+        message: 'Free 1-Click Web Intent generated successfully. Click button to publish directly on X!'
+      }
+    };
   }
 
   /**
@@ -165,16 +199,13 @@ export class TwitterPublisher extends BasePublisher {
         responseData?.type?.includes('credits-depleted');
 
       if (isCreditsDepleted) {
-        const errorMsg =
-          'X / Twitter API: "credits depleted" (HTTP 402 Payment Required). ' +
-          'Your X Developer account has a $0 credit balance on pay-per-use billing. ' +
-          'To resolve: Either attach credits on console.x.com, switch to the Free tier (1,500 posts/month), or toggle ENABLE_TWITTER_REAL=false in Render to test in simulated mode.';
-
-        return {
-          success: false,
-          rawResponse: responseData || { detail: 'credits depleted', status: 402 },
-          error: errorMsg
-        };
+        console.log('[TwitterPublisher] API credits depleted on X. Automatically activating Free 1-Click Web Intent bridge...');
+        return this.publishWebIntent(
+          tweetText,
+          media,
+          account,
+          'X Developer API has $0 credits. Gracefully activated Free 1-Click Web Intent so you can publish directly to X with zero API fees!'
+        );
       }
 
       const errorMsg = responseData?.detail || responseData?.title || err.message || 'Twitter API Error';

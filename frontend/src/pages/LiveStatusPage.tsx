@@ -202,9 +202,13 @@ export const LiveStatusPage: React.FC<Props> = ({ activeDraftId, onSelectDraft, 
                         <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
                           <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Successfully Published
+                            {target.externalUrl?.includes('intent/tweet') ? 'Ready to Share on X (Free)' : 'Successfully Published'}
                           </p>
-                          {target.externalPostId && (
+                          {target.externalUrl?.includes('intent/tweet') ? (
+                            <p className="text-[11px] text-neutral-300">
+                              Free 1-Click Bridge active. Click the button below to open X with pre-filled content and publish with 1 click!
+                            </p>
+                          ) : target.externalPostId && (
                             <p className="text-[11px] text-neutral-400 font-mono truncate">
                               ID: {target.externalPostId}
                             </p>
@@ -286,9 +290,13 @@ export const LiveStatusPage: React.FC<Props> = ({ activeDraftId, onSelectDraft, 
                           href={target.externalUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-black bg-white hover:bg-neutral-200 rounded-lg transition shadow-sm"
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition shadow-sm ${
+                            target.externalUrl.includes('intent/tweet')
+                              ? 'text-white bg-sky-500 hover:bg-sky-600'
+                              : 'text-black bg-white hover:bg-neutral-200'
+                          }`}
                         >
-                          <span>View Live Post</span>
+                          <span>{target.externalUrl.includes('intent/tweet') ? '1-Click Post to X' : 'View Live Post'}</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
