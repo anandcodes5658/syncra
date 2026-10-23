@@ -9,11 +9,76 @@ import {
 
 const API_BASE = '/api';
 
+export function getAuthToken(): string | null {
+  return localStorage.getItem('syncra_auth_token');
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem('syncra_auth_token', token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem('syncra_auth_token');
+  window.dispatchEvent(new Event('syncra:unauthorized'));
+}
+
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers || {});
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const res = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  if (res.status === 401 && !url.includes('/auth/')) {
+    clearAuthToken();
+  }
+
+  return res;
+}
+
+export async function loginWithPassword(password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (res.ok && data.token) {
+      setAuthToken(data.token);
+      return { success: true };
+    }
+    return { success: false, error: data.error || 'Incorrect password.' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Connection failed.' };
+  }
+}
+
+export async function checkAuth(): Promise<boolean> {
+  const token = getAuthToken();
+  if (!token) return false;
+  try {
+    const res = await fetch(`${API_BASE}/auth/check`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data.authenticated;
+  } catch {
+    return false;
+  }
+}
+
 export async function uploadMedia(file: File): Promise<MediaAsset> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE}/media/upload`, {
+  const res = await authFetch(`${API_BASE}/media/upload`, {
     method: 'POST',
     body: formData
   });
@@ -34,7 +99,7 @@ export async function createDraft(payload: {
   platforms: PostTargetInput[];
   scheduled_at?: string;
 }): Promise<{ draftId: string }> {
-  const res = await fetch(`${API_BASE}/posts/draft`, {
+  const res = await authFetch(`${API_BASE}/posts/draft`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -55,7 +120,7 @@ export async function updateDraft(draftId: string, payload: {
   targets?: any[];
   scheduled_at?: string;
 }) {
-  const res = await fetch(`${API_BASE}/posts/${draftId}`, {
+  const res = await authFetch(`${API_BASE}/posts/${draftId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -70,7 +135,7 @@ export async function updateDraft(draftId: string, payload: {
 }
 
 export async function publishDraft(draftId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/posts/${draftId}/publish`, {
+  const res = await authFetch(`${API_BASE}/posts/${draftId}/publish`, {
     method: 'POST'
   });
 
@@ -81,7 +146,7 @@ export async function publishDraft(draftId: string): Promise<void> {
 }
 
 export async function getPostStatus(draftId: string): Promise<PostDraftStatusResponse> {
-  const res = await fetch(`${API_BASE}/posts/${draftId}/status`);
+  const res = await authFetch(`${API_BASE}/posts/${draftId}/status`);
   if (!res.ok) {
     throw new Error('Failed to fetch post status');
   }
@@ -89,7 +154,7 @@ export async function getPostStatus(draftId: string): Promise<PostDraftStatusRes
 }
 
 export async function retryJob(jobId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/jobs/${jobId}/retry`, {
+  const res = await authFetch(`${API_BASE}/jobs/${jobId}/retry`, {
     method: 'POST'
   });
   if (!res.ok) {
@@ -103,21 +168,21 @@ export async function getPosts(params?: { platform?: string; status?: string }):
   if (params?.platform && params.platform !== 'all') query.set('platform', params.platform);
   if (params?.status && params.status !== 'all') query.set('status', params.status);
 
-  const res = await fetch(`${API_BASE}/posts?${query.toString()}`);
+  const res = await authFetch(`${API_BASE}/posts?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch posts');
   const data = await res.json();
   return data.posts || [];
 }
 
 export async function getAccounts(): Promise<ConnectedAccount[]> {
-  const res = await fetch(`${API_BASE}/accounts`);
+  const res = await authFetch(`${API_BASE}/accounts`);
   if (!res.ok) throw new Error('Failed to fetch connected accounts');
   const data = await res.json();
   return data.accounts || [];
 }
 
 export async function mockConnectAccount(platform: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/accounts/mock-connect`, {
+  const res = await authFetch(`${API_BASE}/accounts/mock-connect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ platform })
@@ -130,14 +195,14 @@ export async function mockConnectAccount(platform: string): Promise<void> {
 }
 
 export async function disconnectAccount(accountId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/accounts/${accountId}`, {
+  const res = await authFetch(`${API_BASE}/accounts/${accountId}`, {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to disconnect account');
 }
 
 export async function generateCaptions(masterCaption: string, tone = 'professional & engaging'): Promise<PlatformCaptions> {
-  const res = await fetch(`${API_BASE}/ai/generate-captions`, {
+  const res = await authFetch(`${API_BASE}/ai/generate-captions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ master_caption: masterCaption, tone })
@@ -158,7 +223,7 @@ export async function getHealth() {
 }
 
 export async function getAuditLogs() {
-  const res = await fetch(`${API_BASE}/audit-logs`);
+  const res = await authFetch(`${API_BASE}/audit-logs`);
   const data = await res.json();
   return data.logs || [];
 }

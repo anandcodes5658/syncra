@@ -1,10 +1,11 @@
 import React from 'react';
-import { Send, Activity, History, Link2, Settings, ShieldCheck } from 'lucide-react';
+import { Send, Activity, History, Link2, Settings, ShieldCheck, Lock } from 'lucide-react';
 
 interface Props {
   activeTab: 'create' | 'status' | 'history' | 'accounts' | 'settings';
   onTabChange: (tab: 'create' | 'status' | 'history' | 'accounts' | 'settings') => void;
   hasActiveJobs?: boolean;
+  onLock?: () => void;
 }
 
 interface NavItem {
@@ -14,7 +15,7 @@ interface NavItem {
   badge?: boolean;
 }
 
-export const Navbar: React.FC<Props> = ({ activeTab, onTabChange, hasActiveJobs }) => {
+export const Navbar: React.FC<Props> = ({ activeTab, onTabChange, hasActiveJobs, onLock }) => {
   const navItems: NavItem[] = [
     { id: 'create', label: 'Create Post', icon: Send },
     { id: 'status', label: 'Live Status', icon: Activity, badge: hasActiveJobs },
@@ -66,12 +67,22 @@ export const Navbar: React.FC<Props> = ({ activeTab, onTabChange, hasActiveJobs 
           })}
         </nav>
 
-        {/* Server & OAuth Status Pill */}
-        <div className="hidden md:flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-950 border border-neutral-800 rounded-full text-[11px] text-neutral-300">
+        {/* Server & OAuth Status Pill + Lock Button */}
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-neutral-950 border border-neutral-800 rounded-full text-[11px] text-neutral-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
             <span>API Online</span>
           </div>
+          {onLock && (
+            <button
+              onClick={onLock}
+              title="Lock Workspace"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-xl transition flex items-center gap-1.5 text-xs px-2.5"
+            >
+              <Lock className="w-3.5 h-3.5 text-neutral-400" />
+              <span className="hidden sm:inline text-[11px]">Lock</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

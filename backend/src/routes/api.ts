@@ -12,8 +12,43 @@ import { OAuthController } from '../controllers/oauthController.js';
 import { generateCaptions } from '../controllers/aiController.js';
 import { db } from '../db.js';
 import { config } from '../config/env.js';
+import { authMiddleware, getExpectedToken } from '../middleware/auth.js';
 
 const router = Router();
+
+// --- Auth Gate (Password-Protected Private Workspace) ---
+router.post('/auth/login', (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    res.status(400).json({ success: false, error: 'Password is required.' });
+    return;
+  }
+
+  if (password !== config.dashboardPassword) {
+    res.status(401).json({ success: false, error: 'Incorrect password. Access denied.' });
+    return;
+  }
+
+  const token = getExpectedToken();
+  res.json({ success: true, token });
+});
+
+router.get('/auth/check', (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.substring(7)
+    : (req.headers['x-syncra-key'] as string);
+  const expected = getExpectedToken();
+
+  if (token && token === expected) {
+    res.json({ authenticated: true });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
+// Protect all following routes with Auth Middleware
+router.use(authMiddleware);
 
 // Media
 router.post('/media/upload', uploadMiddleware, uploadMedia);

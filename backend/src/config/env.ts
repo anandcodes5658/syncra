@@ -13,6 +13,7 @@ export const config = {
   frontendUrl: defaultFrontendUrl,
   databaseUrl: process.env.DATABASE_URL || '',
   encryptionKey: process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', // 32 bytes hex default
+  dashboardPassword: process.env.DASHBOARD_PASSWORD || 'Syncra@2026',
 
   // OAuth Meta / Facebook / Instagram
   meta: {

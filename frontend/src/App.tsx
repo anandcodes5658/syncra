@@ -5,14 +5,32 @@ import { LiveStatusPage } from './pages/LiveStatusPage';
 import { ConnectAccountsPage } from './pages/ConnectAccountsPage';
 import { PostHistoryPage } from './pages/PostHistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PasswordGate } from './components/PasswordGate';
 import { ConnectedAccount } from './types';
-import { getAccounts } from './services/api';
+import { getAccounts, checkAuth, clearAuthToken } from './services/api';
 
 export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<'create' | 'status' | 'history' | 'accounts' | 'settings'>('create');
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [hasActiveJobs, setHasActiveJobs] = useState(false);
+
+  useEffect(() => {
+    checkAuth().then((auth) => {
+      setIsAuthenticated(auth);
+      if (auth) {
+        fetchAccountsList();
+      }
+    });
+
+    const handleUnauthorized = () => {
+      setIsAuthenticated(false);
+    };
+
+    window.addEventListener('syncra:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('syncra:unauthorized', handleUnauthorized);
+  }, []);
 
   const fetchAccountsList = async () => {
     try {
@@ -22,10 +40,6 @@ export function App() {
       console.warn('Could not load accounts:', err);
     }
   };
-
-  useEffect(() => {
-    fetchAccountsList();
-  }, []);
 
   const handlePublishSuccess = (draftId: string) => {
     setActiveDraftId(draftId);
@@ -38,6 +52,30 @@ export function App() {
     setActiveTab('status');
   };
 
+  const handleLock = () => {
+    clearAuthToken();
+    setIsAuthenticated(false);
+  };
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-neutral-700 border-t-white animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <PasswordGate
+        onAuthenticated={() => {
+          setIsAuthenticated(true);
+          fetchAccountsList();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-neutral-100 flex flex-col font-sans selection:bg-white selection:text-black">
       {/* Top Navbar */}
@@ -45,6 +83,7 @@ export function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         hasActiveJobs={hasActiveJobs}
+        onLock={handleLock}
       />
 
       {/* Main Screen Content */}
