@@ -171,11 +171,26 @@ export async function getPostStatus(req: Request, res: Response): Promise<void> 
       })
     );
 
+    let overallStatus = draft.status;
+    if (targetStatuses.length > 0) {
+      const allDone = targetStatuses.every(t => t.status === 'published');
+      const hasFailed = targetStatuses.some(t => t.status === 'failed');
+      const isPending = targetStatuses.some(t => t.status === 'pending' || t.status === 'uploading');
+      if (allDone) {
+        overallStatus = 'published';
+        if (draft.status !== 'published') {
+          await db.updatePostDraft(draft.id, { status: 'published' });
+        }
+      } else if (hasFailed && !isPending) {
+        overallStatus = targetStatuses.some(t => t.status === 'published') ? 'partially_failed' : 'failed';
+      }
+    }
+
     res.json({
       draftId: draft.id,
       title: draft.title,
       masterCaption: draft.master_caption,
-      overallStatus: draft.status,
+      overallStatus,
       media,
       targets: targetStatuses
     });
@@ -203,8 +218,32 @@ export async function listPosts(req: Request, res: Response): Promise<void> {
             };
           })
         );
+
+        let effectiveStatus = d.status;
+        if (targetsWithJobs.length > 0) {
+          const allDone = targetsWithJobs.every(t => t.status === 'published' || t.job?.job_status === 'published');
+          const hasFailed = targetsWithJobs.some(t => t.status === 'failed' || t.job?.job_status === 'failed');
+          const isPending = targetsWithJobs.some(t => 
+            (t.status === 'pending' || t.status === 'uploading' || t.job?.job_status === 'pending' || t.job?.job_status === 'uploading') &&
+            t.status !== 'published' && t.job?.job_status !== 'published' &&
+            t.status !== 'failed' && t.job?.job_status !== 'failed'
+          );
+          if (allDone) {
+            effectiveStatus = 'published';
+            if (d.status !== 'published') {
+              db.updatePostDraft(d.id, { status: 'published' }).catch(() => {});
+            }
+          } else if (hasFailed && !isPending) {
+            const someDone = targetsWithJobs.some(t => t.status === 'published' || t.job?.job_status === 'published');
+            effectiveStatus = someDone ? 'partially_failed' : 'failed';
+          } else if (isPending) {
+            effectiveStatus = 'publishing';
+          }
+        }
+
         return {
           ...d,
+          status: effectiveStatus,
           media,
           targets: targetsWithJobs
         };

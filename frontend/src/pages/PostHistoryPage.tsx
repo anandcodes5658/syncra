@@ -164,7 +164,14 @@ export const PostHistoryPage: React.FC<Props> = ({ onSelectDraft }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={post.status} size="sm" />
+                  <StatusBadge
+                    status={
+                      post.targets.length > 0 && post.targets.every(t => t.status === 'published' || t.job?.job_status === 'published')
+                        ? 'published'
+                        : post.status
+                    }
+                    size="sm"
+                  />
                   <span className="text-[11px] text-neutral-500 font-mono">
                     {new Date(post.created_at).toLocaleDateString()}
                   </span>
