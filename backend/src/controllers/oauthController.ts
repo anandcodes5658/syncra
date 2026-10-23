@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
+import crypto from 'crypto';
 import { config } from '../config/env.js';
 import { db } from '../db.js';
 import { encryptToken } from '../services/encryption.js';
@@ -359,9 +360,15 @@ export class OAuthController {
   static async startTwitter(req: Request, res: Response): Promise<void> {
     const scopes = encodeURIComponent('tweet.read tweet.write users.read offline.access');
     const redirectUri = getRedirectUri(req, config.twitter.redirectUri, '/api/oauth/twitter/callback');
+    const verifier = 'syncra_pkce_challenge_secret_string_2026_x';
+    const challenge = crypto.createHash('sha256').update(verifier).digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
     const authUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${config.twitter.clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=${scopes}&state=syncra_state&code_challenge=challenge&code_challenge_method=plain`;
+    )}&scope=${scopes}&state=syncra_state&code_challenge=${challenge}&code_challenge_method=S256`;
 
     res.json({
       authUrl,
@@ -388,7 +395,8 @@ export class OAuthController {
           code: String(code),
           grant_type: 'authorization_code',
           redirect_uri: redirectUri,
-          code_verifier: 'challenge'
+          code_verifier: 'syncra_pkce_challenge_secret_string_2026_x',
+          client_id: config.twitter.clientId
         }).toString(),
         {
           headers: {
