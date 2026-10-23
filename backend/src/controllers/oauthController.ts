@@ -360,7 +360,8 @@ export class OAuthController {
   static async startTwitter(req: Request, res: Response): Promise<void> {
     const scopes = encodeURIComponent('tweet.read tweet.write users.read offline.access');
     const redirectUri = getRedirectUri(req, config.twitter.redirectUri, '/api/oauth/twitter/callback');
-    const verifier = 'syncra_pkce_challenge_secret_string_2026_x';
+    // RFC 7636 requires code_verifier to be between 43 and 128 characters
+    const verifier = 'syncra_oauth2_pkce_challenge_verifier_secret_key_2026_x';
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64')
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
@@ -389,21 +390,28 @@ export class OAuthController {
 
     try {
       const basicAuth = Buffer.from(`${config.twitter.clientId}:${config.twitter.clientSecret}`).toString('base64');
+      const params = new URLSearchParams({
+        code: String(code),
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code_verifier: 'syncra_oauth2_pkce_challenge_verifier_secret_key_2026_x'
+      });
+      // Only include client_id if clientSecret is not used (confidential vs public)
+      if (!config.twitter.clientSecret) {
+        params.append('client_id', config.twitter.clientId);
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+      if (config.twitter.clientSecret) {
+        headers['Authorization'] = `Basic ${basicAuth}`;
+      }
+
       const tokenRes = await axios.post(
         'https://api.twitter.com/2/oauth2/token',
-        new URLSearchParams({
-          code: String(code),
-          grant_type: 'authorization_code',
-          redirect_uri: redirectUri,
-          code_verifier: 'syncra_pkce_challenge_secret_string_2026_x',
-          client_id: config.twitter.clientId
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${basicAuth}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+        params.toString(),
+        { headers }
       );
 
       const { access_token, refresh_token } = tokenRes.data;
@@ -431,7 +439,7 @@ export class OAuthController {
       res.redirect(`${frontendBase}/connect-accounts?success=twitter_connected`);
     } catch (err: any) {
       console.error('Twitter OAuth callback error:', err.response?.data || err.message);
-      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.message)}`);
+      res.redirect(`${frontendBase}/connect-accounts?error=${encodeURIComponent(err.response?.data?.error_description || err.response?.data?.error || err.message)}`);
     }
   }
 

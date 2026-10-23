@@ -8,7 +8,8 @@ import {
   Lock,
   ExternalLink,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { ConnectedAccount, PlatformType } from '../types';
 import { mockConnectAccount, disconnectAccount, getAuthToken } from '../services/api';
@@ -87,6 +88,8 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
   ];
 
   const handleStartOAuth = async (platform: string, startEndpoint: string) => {
+    setConnectingPlatform(platform);
+    setMessage(null);
     try {
       const token = getAuthToken();
       const res = await fetch(startEndpoint, {
@@ -99,14 +102,16 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
       const data = await res.json();
       if (data.configured && data.authUrl) {
         window.location.href = data.authUrl;
-      } else {
-        setMessage({
-          type: 'error',
-          text: data.error || `${platform.toUpperCase()} client credentials not yet configured in .env. Please check your Render environment variables.`
-        });
+        return;
       }
+      setMessage({
+        type: 'error',
+        text: data.error || `${platform.toUpperCase()} client credentials not yet configured in .env. Please check your Render environment variables.`
+      });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'OAuth initiation failed' });
+    } finally {
+      setConnectingPlatform(null);
     }
   };
 
@@ -319,10 +324,20 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
                     <button
                       type="button"
                       onClick={() => handleStartOAuth(platform.id, platform.authStartEndpoint)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-black bg-white hover:bg-neutral-200 rounded-xl transition shadow"
+                      disabled={connectingPlatform === platform.id}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-black bg-white hover:bg-neutral-200 rounded-xl transition shadow disabled:opacity-50"
                     >
-                      <span>OAuth Connect</span>
-                      <ExternalLink className="w-3 h-3" />
+                      {connectingPlatform === platform.id ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>OAuth Connect</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </>
+                      )}
                     </button>
                   </>
                 )}

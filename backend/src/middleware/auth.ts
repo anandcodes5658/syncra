@@ -10,12 +10,15 @@ export function getExpectedToken(): string {
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Public bypass paths
   const path = req.path;
+  const originalUrl = req.originalUrl || '';
   if (
     path === '/auth/login' ||
     path === '/auth/check' ||
     path === '/health' ||
     path.startsWith('/oauth') ||
-    path.includes('/callback')
+    originalUrl.includes('/oauth') ||
+    path.includes('/callback') ||
+    originalUrl.includes('/callback')
   ) {
     next();
     return;
