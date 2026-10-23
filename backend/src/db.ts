@@ -227,26 +227,37 @@ class DatabaseManager {
       console.log('No DATABASE_URL provided. Operating in Zero-Friction JSON persistence mode.');
     }
 
-    // Seed default user if none exists
+    // Seed default user if none exists, or update email to user's real email
     if (this.memoryStore.users.length === 0) {
       this.memoryStore.users.push({
         id: 'usr_syncra_1',
         name: 'Syncra Admin',
-        email: 'team@syncra.io',
+        email: 'anandch5658@gmail.com',
         created_at: new Date().toISOString()
       });
+      this.saveToFile();
+    } else {
+      for (const u of this.memoryStore.users) {
+        if (u.email === 'team@syncra.io') {
+          u.email = 'anandch5658@gmail.com';
+        }
+      }
       this.saveToFile();
     }
   }
 
   // --- Users ---
   async getDefaultUser(): Promise<User> {
-    return this.memoryStore.users[0] || {
+    const user = this.memoryStore.users[0] || {
       id: 'usr_syncra_1',
       name: 'Syncra Admin',
-      email: 'team@syncra.io',
+      email: 'anandch5658@gmail.com',
       created_at: new Date().toISOString()
     };
+    if (user.email === 'team@syncra.io') {
+      user.email = 'anandch5658@gmail.com';
+    }
+    return user;
   }
 
   // --- Connected Accounts ---
