@@ -68,17 +68,33 @@ export class MetaFacebookPublisher extends BasePublisher {
     let pageAccessToken = storedToken;
 
     try {
-      // 1. If stored token is a User token, resolve the specific Page Access Token and Page ID
+      // 1. Fetch Page Access Token directly for the target Page ID
       try {
-        const accountsRes = await axios.get(`https://graph.facebook.com/v19.0/me/accounts?access_token=${storedToken}`);
-        const pageData = accountsRes.data.data?.find((p: any) => p.id === targetPageId) || accountsRes.data.data?.[0];
-        if (pageData) {
-          pageAccessToken = pageData.access_token || storedToken;
-          targetPageId = pageData.id || targetPageId;
+        const pageDirectRes = await axios.get(
+          `https://graph.facebook.com/v19.0/${targetPageId}?fields=id,name,access_token&access_token=${storedToken}`
+        );
+        if (pageDirectRes.data?.access_token) {
+          pageAccessToken = pageDirectRes.data.access_token;
+          console.log(`[MetaFacebookPublisher] Directly retrieved Page Access Token for Page ID: ${targetPageId}`);
         }
-      } catch (e) {
-        // Token is already a direct Page Access Token
+      } catch (err1: any) {
+        // Direct page query failed (e.g. storedToken is user token), query /me/accounts with explicit fields
+        try {
+          const accountsRes = await axios.get(
+            `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${storedToken}`
+          );
+          const pageData = accountsRes.data.data?.find((p: any) => p.id === targetPageId) || accountsRes.data.data?.[0];
+          if (pageData?.access_token) {
+            pageAccessToken = pageData.access_token;
+            targetPageId = pageData.id || targetPageId;
+            console.log(`[MetaFacebookPublisher] Retrieved Page Access Token from /me/accounts for Page: ${pageData.name} (${pageData.id})`);
+          }
+        } catch (err2: any) {
+          console.warn('[MetaFacebookPublisher] /me/accounts token lookup warning:', err2.response?.data?.error?.message || err2.message);
+        }
       }
+
+      console.log(`[MetaFacebookPublisher] Publishing to Facebook Page ${targetPageId}`);
 
       let apiEndpoint = `https://graph.facebook.com/v19.0/${targetPageId}/feed`;
       let payload: Record<string, any> = {
