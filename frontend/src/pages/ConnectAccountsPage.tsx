@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Link2,
   CheckCircle2,
@@ -22,6 +22,19 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const err = params.get('error');
+
+    if (success) {
+      setMessage({ type: 'success', text: 'Social media account connected and verified successfully!' });
+      onRefreshAccounts();
+    } else if (err) {
+      setMessage({ type: 'error', text: decodeURIComponent(err) });
+    }
+  }, []);
 
   const platformsConfig: Array<{
     id: PlatformType;

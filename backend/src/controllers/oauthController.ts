@@ -90,29 +90,26 @@ export class OAuthController {
         console.warn('Failed to fetch /me/accounts from Meta:', err.response?.data || err.message);
       }
 
-      // Store Facebook Page (prefer real Page with Page Access Token)
-      if (pages.length > 0) {
-        const primaryPage = pages[0];
-        await db.saveConnectedAccount({
-          user_id: user.id,
-          platform: 'facebook',
-          account_name: primaryPage.name || 'Facebook Page',
-          external_account_id: primaryPage.id,
-          encrypted_access_token: encryptToken(primaryPage.access_token || accessToken),
-          status: 'connected',
-          scopes: 'pages_manage_posts,pages_read_engagement,pages_show_list'
-        });
-      } else {
-        await db.saveConnectedAccount({
-          user_id: user.id,
-          platform: 'facebook',
-          account_name: meRes.data.name || 'Facebook Page',
-          external_account_id: meRes.data.id,
-          encrypted_access_token: encryptToken(accessToken),
-          status: 'connected',
-          scopes: 'pages_manage_posts,pages_show_list'
-        });
+      // Store Facebook Page (Meta Graph API requires a Facebook Page to publish)
+      if (pages.length === 0) {
+        res.redirect(
+          `${frontendBase}/connect-accounts?error=${encodeURIComponent(
+            'No Facebook Page found under this account. Meta API only allows posting to Facebook Pages (not personal profiles). Please create a Facebook Page at facebook.com/pages/create, then click Connect again.'
+          )}`
+        );
+        return;
       }
+
+      const primaryPage = pages[0];
+      await db.saveConnectedAccount({
+        user_id: user.id,
+        platform: 'facebook',
+        account_name: primaryPage.name || 'Facebook Page',
+        external_account_id: primaryPage.id,
+        encrypted_access_token: encryptToken(primaryPage.access_token || accessToken),
+        status: 'connected',
+        scopes: 'pages_manage_posts,pages_read_engagement,pages_show_list'
+      });
 
       // Check for connected Instagram Business accounts linked to user's pages
       let foundIg = false;
