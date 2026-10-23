@@ -2,8 +2,9 @@ import axios from 'axios';
 import fs from 'fs';
 import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js';
 import { config } from '../../config/env.js';
-import { decryptToken } from '../encryption.js';
+import { decryptToken, encryptToken } from '../encryption.js';
 import { StorageService } from '../storage.js';
+import { db } from '../../db.js';
 
 export class YouTubePublisher extends BasePublisher {
   platformName = 'youtube';
@@ -16,6 +17,43 @@ export class YouTubePublisher extends BasePublisher {
     } else {
       return this.publishMock(target, draft, media, account);
     }
+  }
+
+  /**
+   * Automatically refreshes expired Google OAuth 2.0 access token using refresh_token
+   */
+  private async refreshAccessToken(account: any): Promise<string | null> {
+    if (!account.encrypted_refresh_token) {
+      console.warn('[YouTubePublisher] No refresh token found on YouTube account record.');
+      return null;
+    }
+
+    try {
+      const refreshToken = decryptToken(account.encrypted_refresh_token);
+      const res = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        new URLSearchParams({
+          client_id: config.google.clientId,
+          client_secret: config.google.clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        }).toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }
+      );
+
+      const newAccessToken = res.data?.access_token;
+      if (newAccessToken) {
+        account.encrypted_access_token = encryptToken(newAccessToken);
+        await db.saveConnectedAccount(account);
+        console.log('[YouTubePublisher] Successfully refreshed Google/YouTube access token!');
+        return newAccessToken;
+      }
+    } catch (err: any) {
+      console.error('[YouTubePublisher] Error refreshing Google token:', err.response?.data || err.message);
+    }
+    return null;
   }
 
   /**
@@ -74,7 +112,7 @@ export class YouTubePublisher extends BasePublisher {
       };
     }
 
-    const token = decryptToken(account.encrypted_access_token);
+    let token = decryptToken(account.encrypted_access_token);
     const title = target.title || 'Syncra Update';
     const description = target.description || target.caption || draft.master_caption;
     const privacy = target.privacy || 'public';
@@ -94,18 +132,54 @@ export class YouTubePublisher extends BasePublisher {
         }
       };
 
-      const initResponse = await axios.post(
-        'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
-        metadata,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json; charset=UTF-8',
-            'X-Upload-Content-Type': media.file_type || 'video/mp4',
-            'X-Upload-Content-Length': media.file_size
+      let initResponse;
+      try {
+        initResponse = await axios.post(
+          'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+          metadata,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json; charset=UTF-8',
+              'X-Upload-Content-Type': media.file_type || 'video/mp4',
+              'X-Upload-Content-Length': media.file_size
+            }
           }
+        );
+      } catch (initErr: any) {
+        const isAuthError =
+          initErr.response?.status === 401 ||
+          initErr.response?.data?.error?.status === 'UNAUTHENTICATED' ||
+          JSON.stringify(initErr.response?.data || '').includes('authentication credentials');
+
+        if (isAuthError) {
+          console.log('[YouTubePublisher] Detected expired Google token. Attempting automatic refresh...');
+          const freshToken = await this.refreshAccessToken(account);
+          if (freshToken) {
+            token = freshToken;
+            initResponse = await axios.post(
+              'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+              metadata,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json; charset=UTF-8',
+                  'X-Upload-Content-Type': media.file_type || 'video/mp4',
+                  'X-Upload-Content-Length': media.file_size
+                }
+              }
+            );
+          } else {
+            return {
+              success: false,
+              rawResponse: initErr.response?.data || { message: initErr.message },
+              error: 'YouTube Google access token expired. Click "Reconnect Token" under YouTube in the Accounts tab to re-authorize.'
+            };
+          }
+        } else {
+          throw initErr;
         }
-      );
+      }
 
       const uploadUrl = initResponse.headers.location;
       if (!uploadUrl) {

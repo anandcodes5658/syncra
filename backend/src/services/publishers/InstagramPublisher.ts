@@ -107,7 +107,7 @@ export class InstagramPublisher extends BasePublisher {
       const maxAttempts = 15;
 
       while (attempts < maxAttempts && (status === 'IN_PROGRESS' || status === 'STARTED')) {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 1200));
         attempts++;
         const statusRes = await axios.get(`https://graph.facebook.com/v19.0/${containerId}`, {
           params: { fields: 'status_code', access_token: token }

@@ -304,9 +304,17 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
                     <button
                       type="button"
                       onClick={() => handleStartOAuth(platform.id, platform.authStartEndpoint)}
-                      className="text-xs text-neutral-400 hover:text-white underline"
+                      disabled={connectingPlatform === platform.id}
+                      className="text-xs text-neutral-400 hover:text-white underline flex items-center gap-1 transition"
                     >
-                      Reconnect Token
+                      {connectingPlatform === platform.id ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Reconnecting...</span>
+                        </>
+                      ) : (
+                        <span>Reconnect Token</span>
+                      )}
                     </button>
                   </>
                 ) : (

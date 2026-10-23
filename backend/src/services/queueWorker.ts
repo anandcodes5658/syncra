@@ -15,30 +15,34 @@ class QueueWorker {
     twitter: new TwitterPublisher()
   };
 
-  private isProcessing = false;
+  private activeJobs = new Set<string>();
+  private maxConcurrency = 6;
   private queue: string[] = []; // array of job IDs
 
   enqueue(jobId: string) {
-    this.queue.push(jobId);
-    this.processNext();
+    if (!this.queue.includes(jobId) && !this.activeJobs.has(jobId)) {
+      this.queue.push(jobId);
+    }
+    this.processQueue();
   }
 
-  private async processNext() {
-    if (this.isProcessing || this.queue.length === 0) return;
-    this.isProcessing = true;
+  private async processQueue() {
+    while (this.queue.length > 0 && this.activeJobs.size < this.maxConcurrency) {
+      const jobId = this.queue.shift();
+      if (!jobId) break;
 
-    const jobId = this.queue.shift();
-    if (jobId) {
-      try {
-        await this.executeJob(jobId);
-      } catch (err) {
-        console.error(`Error processing job ${jobId}:`, err);
-      }
-    }
-
-    this.isProcessing = false;
-    if (this.queue.length > 0) {
-      setTimeout(() => this.processNext(), 100);
+      this.activeJobs.add(jobId);
+      // Execute in parallel background worker
+      (async () => {
+        try {
+          await this.executeJob(jobId);
+        } catch (err) {
+          console.error(`Error processing job ${jobId}:`, err);
+        } finally {
+          this.activeJobs.delete(jobId);
+          this.processQueue();
+        }
+      })();
     }
   }
 
@@ -46,8 +50,8 @@ class QueueWorker {
     const job = await db.getPublishJob(jobId);
     if (!job) return;
 
-    const allTargets = await db.listPublishJobs();
-    const target = (await db.getPostTargetsByDraftId('')).find(t => t.id === job.post_target_id)
+    // Instant O(1) target lookup
+    const target = await db.getPostTarget(job.post_target_id)
       || await this.findTargetById(job.post_target_id);
 
     if (!target) {

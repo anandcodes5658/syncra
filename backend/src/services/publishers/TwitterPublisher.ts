@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js';
 import { config } from '../../config/env.js';
-import { decryptToken } from '../encryption.js';
+import { decryptToken, encryptToken } from '../encryption.js';
+import { db } from '../../db.js';
 
 export class TwitterPublisher extends BasePublisher {
   platformName = 'twitter';
@@ -15,6 +16,49 @@ export class TwitterPublisher extends BasePublisher {
     } else {
       return this.publishMock(tweetText, media, account);
     }
+  }
+
+  /**
+   * Refreshes expired Twitter OAuth 2.0 access token using refresh_token
+   */
+  private async refreshAccessToken(account: any): Promise<string | null> {
+    if (!account.encrypted_refresh_token) {
+      return null;
+    }
+
+    try {
+      const refreshToken = decryptToken(account.encrypted_refresh_token);
+      const basicAuth = Buffer.from(`${config.twitter.clientId}:${config.twitter.clientSecret}`).toString('base64');
+      const res = await axios.post(
+        'https://api.twitter.com/2/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: config.twitter.clientId
+        }).toString(),
+        {
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      const newAccessToken = res.data?.access_token;
+      const newRefreshToken = res.data?.refresh_token;
+      if (newAccessToken) {
+        account.encrypted_access_token = encryptToken(newAccessToken);
+        if (newRefreshToken) {
+          account.encrypted_refresh_token = encryptToken(newRefreshToken);
+        }
+        await db.saveConnectedAccount(account);
+        console.log('[TwitterPublisher] Successfully refreshed Twitter / X access token!');
+        return newAccessToken;
+      }
+    } catch (err: any) {
+      console.error('[TwitterPublisher] Error refreshing Twitter token:', err.response?.data || err.message);
+    }
+    return null;
   }
 
   /**
@@ -68,23 +112,39 @@ export class TwitterPublisher extends BasePublisher {
       };
     }
 
-    const token = decryptToken(account.encrypted_access_token);
+    let token = decryptToken(account.encrypted_access_token);
 
     try {
       const payload: Record<string, any> = {
         text: tweetText
       };
 
-      // TODO: When media upload is requested for Twitter:
-      // 1. Upload to https://upload.twitter.com/1.1/media/upload.json
-      // 2. Attach media_ids: payload.media = { media_ids: [mediaId] }
-
-      const response = await axios.post('https://api.twitter.com/2/tweets', payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      let response;
+      try {
+        response = await axios.post('https://api.twitter.com/2/tweets', payload, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (postErr: any) {
+        if (postErr.response?.status === 401) {
+          const freshToken = await this.refreshAccessToken(account);
+          if (freshToken) {
+            token = freshToken;
+            response = await axios.post('https://api.twitter.com/2/tweets', payload, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+          } else {
+            throw postErr;
+          }
+        } else {
+          throw postErr;
         }
-      });
+      }
 
       const tweetId = response.data?.data?.id;
       const handle = account.account_name?.replace('@', '') || 'i';
@@ -97,10 +157,30 @@ export class TwitterPublisher extends BasePublisher {
         rawResponse: response.data
       };
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.response?.data?.title || err.message || 'Twitter API Error';
+      const responseData = err.response?.data;
+      const isCreditsDepleted =
+        err.response?.status === 402 ||
+        responseData?.title === 'Payment Required' ||
+        responseData?.detail?.includes('credits depleted') ||
+        responseData?.type?.includes('credits-depleted');
+
+      if (isCreditsDepleted) {
+        const errorMsg =
+          'X / Twitter API: "credits depleted" (HTTP 402 Payment Required). ' +
+          'Your X Developer account has a $0 credit balance on pay-per-use billing. ' +
+          'To resolve: Either attach credits on console.x.com, switch to the Free tier (1,500 posts/month), or toggle ENABLE_TWITTER_REAL=false in Render to test in simulated mode.';
+
+        return {
+          success: false,
+          rawResponse: responseData || { detail: 'credits depleted', status: 402 },
+          error: errorMsg
+        };
+      }
+
+      const errorMsg = responseData?.detail || responseData?.title || err.message || 'Twitter API Error';
       return {
         success: false,
-        rawResponse: err.response?.data || { message: err.message },
+        rawResponse: responseData || { message: err.message },
         error: errorMsg
       };
     }

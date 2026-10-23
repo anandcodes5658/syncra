@@ -351,6 +351,10 @@ class DatabaseManager {
     return this.memoryStore.post_targets.filter(t => t.post_draft_id === draftId);
   }
 
+  async getPostTarget(id: string): Promise<PostTarget | undefined> {
+    return this.memoryStore.post_targets.find(t => t.id === id);
+  }
+
   async updatePostTarget(id: string, updates: Partial<PostTarget>): Promise<PostTarget | undefined> {
     const target = this.memoryStore.post_targets.find(t => t.id === id);
     if (!target) return undefined;
