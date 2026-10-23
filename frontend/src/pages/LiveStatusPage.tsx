@@ -225,12 +225,22 @@ export const LiveStatusPage: React.FC<Props> = ({ activeDraftId, onSelectDraft, 
                       )}
 
                       {isFailed && (
-                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1">
-                          <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            Publish Failed
-                          </p>
-                          <p className="text-[11px] text-rose-300 line-clamp-2">
+                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              {target.lastError?.includes('not connected') ? 'Account Not Connected' : 'Publish Failed'}
+                            </p>
+                            {target.lastError?.includes('not connected') && (
+                              <a
+                                href="/connect-accounts"
+                                className="text-[10px] font-semibold text-white bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 px-2 py-0.5 rounded-md transition"
+                              >
+                                Connect Now &rarr;
+                              </a>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-rose-300 leading-relaxed">
                             {target.lastError || 'Unknown API error occurred'}
                           </p>
                         </div>

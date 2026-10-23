@@ -29,6 +29,11 @@ export const PublishModal: React.FC<Props> = ({
 
   const warnings: string[] = [];
 
+  const unconnected = selectedPlatforms.filter(p => !accounts.some(a => a.platform === p && a.status === 'connected'));
+  if (unconnected.length > 0) {
+    warnings.push(`${unconnected.map(p => platformNames[p]).join(', ')}: Account not connected. Posts to unconnected channels will not publish.`);
+  }
+
   if (selectedPlatforms.includes('youtube') && (!media || !media.file_type.startsWith('video/'))) {
     warnings.push('YouTube posting requires a video file format.');
   }
@@ -81,7 +86,7 @@ export const PublishModal: React.FC<Props> = ({
                   <div>
                     <p className="text-xs font-semibold text-white">{platformNames[p]}</p>
                     <p className="text-[10px] text-neutral-400 truncate max-w-[120px]">
-                      {account?.account_name || 'Mock Dev Mode'}
+                      {isConnected ? account.account_name : 'Not Connected'}
                     </p>
                   </div>
                   <span

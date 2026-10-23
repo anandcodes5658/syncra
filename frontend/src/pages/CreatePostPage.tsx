@@ -22,14 +22,23 @@ export const CreatePostPage: React.FC<Props> = ({ accounts, onPublishSuccess }) 
   );
   const [postTitle, setPostTitle] = useState('Syncra Multi-Platform Release');
 
-  // Selected platforms
-  const [selectedPlatforms, setSelectedPlatforms] = useState<PlatformType[]>([
-    'instagram',
-    'facebook',
-    'linkedin',
-    'youtube',
-    'twitter'
-  ]);
+  // Selected platforms - auto-select only connected platforms by default!
+  const [selectedPlatforms, setSelectedPlatforms] = useState<PlatformType[]>(() => {
+    const connected = accounts.filter(a => a.status === 'connected').map(a => a.platform);
+    return connected.length > 0 ? connected : ['instagram', 'facebook'];
+  });
+
+  // Keep selected platforms synchronized if accounts are refreshed
+  React.useEffect(() => {
+    const connected = accounts.filter(a => a.status === 'connected').map(a => a.platform);
+    if (connected.length > 0) {
+      setSelectedPlatforms(prev => {
+        // If nothing selected or only defaults, switch to all connected accounts
+        if (prev.length === 0) return connected;
+        return prev;
+      });
+    }
+  }, [accounts]);
 
   // Active preview tab
   const [activePlatformTab, setActivePlatformTab] = useState<PlatformType>('instagram');
@@ -254,38 +263,71 @@ export const CreatePostPage: React.FC<Props> = ({ accounts, onPublishSuccess }) 
           {platformsList.map((platform) => {
             const isSelected = selectedPlatforms.includes(platform.id);
             const account = accounts.find((a) => a.platform === platform.id);
+            const isConnected = account && account.status === 'connected';
+
             return (
               <div
                 key={platform.id}
                 onClick={() => togglePlatform(platform.id)}
                 className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center justify-between select-none ${
                   isSelected
-                    ? 'bg-neutral-900 border-white text-white'
+                    ? isConnected
+                      ? 'bg-neutral-900 border-white text-white'
+                      : 'bg-rose-950/20 border-rose-500/40 text-white'
                     : 'bg-[#0a0a0a] border-neutral-800 text-neutral-400 hover:border-neutral-700'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {isSelected ? (
-                    <CheckSquare className="w-4 h-4 text-white" />
+                    <CheckSquare className={`w-4 h-4 ${isConnected ? 'text-white' : 'text-rose-400'}`} />
                   ) : (
                     <Square className="w-4 h-4 text-neutral-500" />
                   )}
                   <div>
-                    <p className="text-xs font-semibold text-white">{platform.label}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-white">{platform.label}</p>
+                      {isConnected ? (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full font-mono">
+                          Ready
+                        </span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-neutral-800 text-neutral-400 rounded-full font-mono">
+                          Not Connected
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-neutral-400 truncate max-w-[120px]">
-                      {account ? account.account_name : 'Mock Mode'}
+                      {isConnected ? account.account_name : 'No account linked'}
                     </p>
                   </div>
                 </div>
                 <span
                   className={`w-2 h-2 rounded-full ${
-                    account?.status === 'connected' ? 'bg-emerald-400' : 'bg-neutral-600'
+                    isConnected ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-neutral-600'
                   }`}
                 />
               </div>
             );
           })}
         </div>
+
+        {/* Warning if any selected platform is unconnected */}
+        {selectedPlatforms.some(p => !accounts.some(a => a.platform === p && a.status === 'connected')) && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>
+                One or more selected platforms are not connected. Unconnected platforms will not be published.
+              </span>
+            </div>
+            <a
+              href="/connect-accounts"
+              className="text-xs text-white underline hover:no-underline font-semibold shrink-0 ml-3"
+            >
+              Connect Accounts &rarr;
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Step 3: Platform Customization & Previews */}
@@ -442,7 +484,11 @@ export const CreatePostPage: React.FC<Props> = ({ accounts, onPublishSuccess }) 
             className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-semibold text-black bg-white hover:bg-neutral-200 rounded-xl shadow-lg transition active:scale-95"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>{isScheduling ? 'Review & Schedule' : 'Post Now to All Selected'}</span>
+            <span>
+              {isScheduling
+                ? 'Review & Schedule'
+                : `Post to ${selectedPlatforms.length} Platform${selectedPlatforms.length === 1 ? '' : 's'}`}
+            </span>
           </button>
         </div>
       </div>

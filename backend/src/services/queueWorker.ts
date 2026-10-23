@@ -70,6 +70,34 @@ class QueueWorker {
     const media = draft.media_asset_id ? await db.getMediaAsset(draft.media_asset_id) : undefined;
     const account = await db.getConnectedAccountByPlatform(draft.user_id, target.platform);
 
+    // STRICT CONNECTION CHECK: Never simulate or claim success if account is not connected
+    if (!account || account.status !== 'connected') {
+      const platformDisplay = target.platform.charAt(0).toUpperCase() + target.platform.slice(1);
+      const errorMessage = `${platformDisplay} is not connected. Please connect your ${platformDisplay} account in the Accounts tab before publishing.`;
+
+      await db.updatePublishJob(jobId, {
+        job_status: 'failed',
+        last_error: errorMessage,
+        api_response_json: {
+          error: 'NOT_CONNECTED',
+          platform: target.platform,
+          message: errorMessage
+        }
+      });
+      await db.updatePostTarget(target.id, { status: 'failed' });
+      await db.createAuditLog({
+        user_id: draft.user_id,
+        action: 'PUBLISH_FAILED',
+        platform: target.platform,
+        request_id: jobId,
+        metadata_json: {
+          error: errorMessage,
+          reason: 'No connected account found in database'
+        }
+      });
+      return;
+    }
+
     // Step 1: Update status to uploading
     await db.updatePublishJob(jobId, {
       job_status: 'uploading',

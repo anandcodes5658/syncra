@@ -129,17 +129,18 @@ export class InstagramPublisher extends BasePublisher {
 
       const igMediaId = publishRes.data.id;
 
-      // Optional: Fetch permalink
-      let permalink = `https://www.instagram.com/`;
+      // Fetch permalink or profile fallback
+      const handle = account?.account_name?.replace('@', '') || 'syncra.ai_';
+      let permalink = `https://www.instagram.com/${handle}/`;
       try {
         const infoRes = await axios.get(`https://graph.facebook.com/v19.0/${igMediaId}`, {
           params: { fields: 'permalink', access_token: token }
         });
-        if (infoRes.data.permalink) {
+        if (infoRes.data?.permalink) {
           permalink = infoRes.data.permalink;
         }
       } catch (err) {
-        // Fallback to media ID
+        // Fallback to profile URL
       }
 
       return {
