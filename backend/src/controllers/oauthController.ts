@@ -35,9 +35,10 @@ export class OAuthController {
 
     const redirectUri = getRedirectUri(req, config.meta.redirectUri, '/api/oauth/meta/callback');
 
+    // auth_type=rerequest forces Meta to re-prompt for Page and Instagram selection
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${config.meta.appId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=${scopes}&response_type=code`;
+    )}&scope=${scopes}&response_type=code&auth_type=rerequest`;
 
     res.json({
       authUrl,
@@ -90,11 +91,31 @@ export class OAuthController {
         console.warn('Failed to fetch /me/accounts from Meta:', err.response?.data || err.message);
       }
 
+      // Check New Page Experience (NPE) context where /me might directly be the Page
+      if (pages.length === 0) {
+        try {
+          const directPageRes = await axios.get(
+            `https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username,name}&access_token=${accessToken}`
+          );
+          if (directPageRes.data?.instagram_business_account) {
+            console.log('User logged in with Page profile context in NPE:', directPageRes.data);
+            pages.push({
+              id: directPageRes.data.id,
+              name: directPageRes.data.name,
+              access_token: accessToken,
+              instagram_business_account: directPageRes.data.instagram_business_account
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
       // Store Facebook Page (Meta Graph API requires a Facebook Page to publish)
       if (pages.length === 0) {
         res.redirect(
           `${frontendBase}/connect-accounts?error=${encodeURIComponent(
-            'No Facebook Page found under this account. Meta API only allows posting to Facebook Pages (not personal profiles). Please create a Facebook Page at facebook.com/pages/create, then click Connect again.'
+            'No Facebook Page found. When the Facebook dialog opens, please ensure you check the box next to your "Syncra Ai" Page and linked Instagram account.'
           )}`
         );
         return;
@@ -117,7 +138,7 @@ export class OAuthController {
         if (p.instagram_business_account?.id) {
           foundIg = true;
           const igId = p.instagram_business_account.id;
-          const igUsername = p.instagram_business_account.username || p.name;
+          const igUsername = p.instagram_business_account.username || 'syncra.ai_';
           await db.saveConnectedAccount({
             user_id: user.id,
             platform: 'instagram',
@@ -127,6 +148,7 @@ export class OAuthController {
             status: 'connected',
             scopes: 'instagram_content_publish,instagram_basic'
           });
+          console.log(`Connected Instagram account @${igUsername} (ID: ${igId})`);
           break;
         }
       }
