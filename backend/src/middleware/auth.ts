@@ -14,6 +14,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     path === '/auth/login' ||
     path === '/auth/check' ||
     path === '/health' ||
+    path.startsWith('/oauth') ||
     path.includes('/callback')
   ) {
     next();

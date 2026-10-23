@@ -11,7 +11,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { ConnectedAccount, PlatformType } from '../types';
-import { mockConnectAccount, disconnectAccount } from '../services/api';
+import { mockConnectAccount, disconnectAccount, getAuthToken } from '../services/api';
 
 interface Props {
   accounts: ConnectedAccount[];
@@ -88,14 +88,21 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
 
   const handleStartOAuth = async (platform: string, startEndpoint: string) => {
     try {
-      const res = await fetch(startEndpoint, { method: 'POST' });
+      const token = getAuthToken();
+      const res = await fetch(startEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
       const data = await res.json();
       if (data.configured && data.authUrl) {
         window.location.href = data.authUrl;
       } else {
         setMessage({
           type: 'error',
-          text: `${platform.toUpperCase()} client credentials not yet configured in .env. Use "Connect Mock Test Account" below for instant demo testing!`
+          text: data.error || `${platform.toUpperCase()} client credentials not yet configured in .env. Please check your Render environment variables.`
         });
       }
     } catch (err: any) {
