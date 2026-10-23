@@ -227,7 +227,7 @@ class DatabaseManager {
       console.log('No DATABASE_URL provided. Operating in Zero-Friction JSON persistence mode.');
     }
 
-    // Seed default user if none exists, or update email to user's real email
+    // Seed default user if none exists, or ensure email is anandch5658@gmail.com
     if (this.memoryStore.users.length === 0) {
       this.memoryStore.users.push({
         id: 'usr_syncra_1',
@@ -238,9 +238,7 @@ class DatabaseManager {
       this.saveToFile();
     } else {
       for (const u of this.memoryStore.users) {
-        if (u.email === 'team@syncra.io') {
-          u.email = 'anandch5658@gmail.com';
-        }
+        u.email = 'anandch5658@gmail.com';
       }
       this.saveToFile();
     }
@@ -254,9 +252,7 @@ class DatabaseManager {
       email: 'anandch5658@gmail.com',
       created_at: new Date().toISOString()
     };
-    if (user.email === 'team@syncra.io') {
-      user.email = 'anandch5658@gmail.com';
-    }
+    user.email = 'anandch5658@gmail.com';
     return user;
   }
 

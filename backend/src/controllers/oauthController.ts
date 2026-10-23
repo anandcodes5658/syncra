@@ -471,7 +471,7 @@ export class OAuthController {
           scopes: 'pages_show_list,pages_manage_posts,publish_video'
         },
         instagram: {
-          name: '@syncra.io',
+          name: '@syncra.ai_',
           externalId: '178414009283746',
           scopes: 'instagram_basic,instagram_content_publish'
         },

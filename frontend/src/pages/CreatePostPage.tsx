@@ -318,7 +318,7 @@ export const CreatePostPage: React.FC<Props> = ({ accounts, onPublishSuccess }) 
               caption={platformData.instagram.caption || masterCaption}
               hashtags={platformData.instagram.hashtags}
               media={media}
-              accountName={accounts.find(a => a.platform === 'instagram')?.account_name || 'syncra.io'}
+              accountName={accounts.find(a => a.platform === 'instagram')?.account_name || '@syncra.ai_'}
               onCaptionChange={(caption) =>
                 setPlatformData({
                   ...platformData,

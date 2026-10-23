@@ -15,7 +15,7 @@ export const InstagramPreview: React.FC<Props> = ({
   caption,
   hashtags,
   media,
-  accountName = 'syncra.io',
+  accountName = 'syncra.ai_',
   onCaptionChange
 }) => {
   return (
