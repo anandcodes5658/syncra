@@ -38,6 +38,14 @@ export class StorageService {
   }
 
   /**
+   * Resolves the absolute local disk path for a stored upload
+   */
+  static getLocalFilePath(filenameOrPath: string): string {
+    const filename = filenameOrPath.replace(/^\/uploads\//, '').replace(/^.*\/uploads\//, '');
+    return path.join(config.storage.uploadDir, filename);
+  }
+
+  /**
    * Validates media file requirements per platform
    */
   static validatePlatformMedia(fileType: string, fileSize: number, platform: string): { valid: boolean; error?: string } {

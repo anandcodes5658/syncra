@@ -3,6 +3,7 @@ import fs from 'fs';
 import { BasePublisher, PublishContext, PublishResult } from './BasePublisher.js';
 import { config } from '../../config/env.js';
 import { decryptToken } from '../encryption.js';
+import { StorageService } from '../storage.js';
 
 export class YouTubePublisher extends BasePublisher {
   platformName = 'youtube';
@@ -111,14 +112,11 @@ export class YouTubePublisher extends BasePublisher {
         throw new Error('Could not obtain YouTube resumable upload URL.');
       }
 
-      // Step 2: Stream/Upload video file bytes if stored locally
-      // Assuming local file storage path resolution
-      const localFilePath = media.file_url.startsWith('http')
-        ? undefined
-        : media.file_url;
-
+      // Step 2: Stream/Upload video file bytes
+      const localFilePath = StorageService.getLocalFilePath(media.file_url);
       let uploadResultData: any;
-      if (localFilePath && fs.existsSync(localFilePath)) {
+
+      if (fs.existsSync(localFilePath)) {
         const fileStream = fs.createReadStream(localFilePath);
         const uploadRes = await axios.put(uploadUrl, fileStream, {
           headers: {
@@ -128,8 +126,17 @@ export class YouTubePublisher extends BasePublisher {
         });
         uploadResultData = uploadRes.data;
       } else {
-        // Mock fallback if public URL cannot be streamed directly
-        uploadResultData = { id: `yt_${Date.now()}` };
+        // Stream from absolute public URL
+        const streamRes = await axios.get(StorageService.getAbsolutePublicUrl(media.file_url), {
+          responseType: 'stream'
+        });
+        const uploadRes = await axios.put(uploadUrl, streamRes.data, {
+          headers: {
+            'Content-Type': media.file_type || 'video/mp4',
+            'Content-Length': media.file_size
+          }
+        });
+        uploadResultData = uploadRes.data;
       }
 
       const videoId = uploadResultData.id;
