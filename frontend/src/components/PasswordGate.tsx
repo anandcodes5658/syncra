@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ArrowRight, Eye, EyeOff, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, ArrowRight, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { loginWithPassword } from '../services/api';
 
 interface Props {
@@ -109,12 +109,6 @@ export const PasswordGate: React.FC<Props> = ({ onAuthenticated }) => {
             )}
           </button>
         </form>
-
-        {/* Security Info */}
-        <div className="pt-2 border-t border-neutral-900 flex items-center justify-center gap-1.5 text-[10px] text-neutral-500 font-mono">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500/70" />
-          <span>Server-Side Authenticated • Zero Leak</span>
-        </div>
       </div>
     </div>
   );
