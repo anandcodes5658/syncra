@@ -74,22 +74,54 @@ export async function checkAuth(): Promise<boolean> {
   }
 }
 
-export async function uploadMedia(file: File): Promise<MediaAsset> {
-  const formData = new FormData();
-  formData.append('file', file);
+export async function uploadMedia(file: File, onProgress?: (percent: number) => void): Promise<MediaAsset> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/media/upload`);
 
-  const res = await authFetch(`${API_BASE}/media/upload`, {
-    method: 'POST',
-    body: formData
+    const token = getAuthToken();
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.media);
+        } catch (e) {
+          reject(new Error('Invalid response from server'));
+        }
+      } else {
+        if (xhr.status === 401) {
+          clearAuthToken();
+        }
+        try {
+          const errorData = JSON.parse(xhr.responseText);
+          reject(new Error(errorData.error || 'Failed to upload media'));
+        } catch {
+          reject(new Error(`Upload failed with HTTP ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during media upload'));
+    };
+
+    const formData = new FormData();
+    formData.append('file', file);
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to upload media');
-  }
-
-  const data = await res.json();
-  return data.media;
 }
 
 export async function createDraft(payload: {

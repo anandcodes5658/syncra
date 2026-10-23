@@ -12,20 +12,25 @@ interface Props {
 export const FileUpload: React.FC<Props> = ({ media, onMediaUploaded }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
     setError(null);
     setUploading(true);
+    setUploadProgress(0);
 
     try {
-      const asset = await uploadMedia(file);
+      const asset = await uploadMedia(file, (percent) => {
+        setUploadProgress(percent);
+      });
       onMediaUploaded(asset);
     } catch (err: any) {
       setError(err.message || 'Failed to upload media file');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -120,10 +125,21 @@ export const FileUpload: React.FC<Props> = ({ media, onMediaUploaded }) => {
           }`}
         >
           {uploading ? (
-            <div className="flex flex-col items-center justify-center py-4">
+            <div className="flex flex-col items-center justify-center py-4 w-full max-w-xs mx-auto">
               <Loader2 className="w-8 h-8 text-white animate-spin mb-3" />
-              <p className="text-sm font-medium text-white">Uploading media to storage...</p>
-              <p className="text-xs text-neutral-500 mt-1">Generating public media endpoint</p>
+              <p className="text-sm font-semibold text-white">
+                {uploadProgress < 100 ? `Uploading media... ${uploadProgress}%` : 'Processing & optimizing media...'}
+              </p>
+              {/* Progress bar */}
+              <div className="w-full bg-neutral-800 rounded-full h-1.5 mt-3 overflow-hidden">
+                <div
+                  className="bg-white h-full rounded-full transition-all duration-150"
+                  style={{ width: `${Math.max(uploadProgress, 5)}%` }}
+                />
+              </div>
+              <p className="text-xs text-neutral-400 mt-2 font-mono">
+                {uploadProgress < 100 ? `${uploadProgress}% uploaded` : 'Generating multi-platform streaming endpoint...'}
+              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-2">

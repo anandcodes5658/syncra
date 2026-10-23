@@ -104,28 +104,70 @@ export class InstagramPublisher extends BasePublisher {
       // Step 2: Poll container status until FINISHED or ERROR
       let status = 'IN_PROGRESS';
       let attempts = 0;
-      const maxAttempts = 15;
+      // Large video files (e.g. 50MB) require longer transcoding on Meta servers
+      const maxAttempts = isVideo ? 50 : 20;
+      const pollInterval = isVideo ? 2000 : 1000;
 
       while (attempts < maxAttempts && (status === 'IN_PROGRESS' || status === 'STARTED')) {
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, pollInterval));
         attempts++;
-        const statusRes = await axios.get(`https://graph.facebook.com/v19.0/${containerId}`, {
-          params: { fields: 'status_code', access_token: token }
-        });
-        status = statusRes.data.status_code;
-        if (status === 'FINISHED') break;
-        if (status === 'ERROR' || status === 'EXPIRED') {
-          throw new Error(`Media container processing failed with status: ${status}`);
+        try {
+          const statusRes = await axios.get(`https://graph.facebook.com/v19.0/${containerId}`, {
+            params: { fields: 'status_code,status', access_token: token }
+          });
+          status = statusRes.data.status_code || statusRes.data.status;
+          console.log(`[InstagramPublisher] Container ${containerId} status (attempt ${attempts}/${maxAttempts}): ${status}`);
+          if (status === 'FINISHED') break;
+          if (status === 'ERROR' || status === 'EXPIRED') {
+            throw new Error(`Media container processing failed with status: ${status}`);
+          }
+        } catch (e: any) {
+          if (e.message?.includes('Media container processing failed')) throw e;
+          // Transient network glitch during polling, continue
         }
       }
 
-      // Step 3: Publish container
-      const publishRes = await axios.post(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, null, {
-        params: {
-          creation_id: containerId,
-          access_token: token
+      if (status !== 'FINISHED') {
+        const sizeMb = Math.round((media.file_size || 0) / (1024 * 1024));
+        throw new Error(
+          `Instagram media transcoding is taking longer for this ${sizeMb}MB file. Status is still '${status}'. Please wait a moment and click Retry.`
+        );
+      }
+
+      // Small stabilization buffer for Meta distributed propagation
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // Step 3: Publish container with automatic retry for transient subcode 2207027 (media not ready yet)
+      let publishRes;
+      let publishAttempts = 0;
+      const maxPublishAttempts = 4;
+
+      while (publishAttempts < maxPublishAttempts) {
+        publishAttempts++;
+        try {
+          publishRes = await axios.post(`https://graph.facebook.com/v19.0/${igUserId}/media_publish`, null, {
+            params: {
+              creation_id: containerId,
+              access_token: token
+            }
+          });
+          break; // Succeeded!
+        } catch (pubErr: any) {
+          const subcode = pubErr.response?.data?.error?.error_subcode;
+          const isNotReady = subcode === 2207027 || pubErr.response?.data?.error?.code === 9007;
+
+          if (isNotReady && publishAttempts < maxPublishAttempts) {
+            console.log(`[InstagramPublisher] Media not quite ready (subcode 2207027). Backing off 4s before retry ${publishAttempts}/${maxPublishAttempts}...`);
+            await new Promise((r) => setTimeout(r, 4000));
+          } else {
+            throw pubErr;
+          }
         }
-      });
+      }
+
+      if (!publishRes) {
+        throw new Error('Failed to publish Instagram media container.');
+      }
 
       const igMediaId = publishRes.data.id;
 

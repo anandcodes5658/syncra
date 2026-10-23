@@ -216,10 +216,14 @@ export const LiveStatusPage: React.FC<Props> = ({ activeDraftId, onSelectDraft, 
                         <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
                           <p className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            Uploading & Container Processing...
+                            {target.platform === 'instagram'
+                              ? 'Transcoding Reel & Processing...'
+                              : 'Uploading & Publishing...'}
                           </p>
                           <p className="text-[11px] text-neutral-400">
-                            Worker is transmitting payload to official API endpoint
+                            {target.platform === 'instagram'
+                              ? 'Meta servers are encoding video format for Instagram Reels'
+                              : 'Worker is transmitting payload to official API endpoint'}
                           </p>
                         </div>
                       )}
