@@ -20,6 +20,7 @@ export interface ConnectedAccount {
   status: 'connected' | 'expired' | 'disconnected';
   expires_at?: string;
   hasAccessToken?: boolean;
+  metadata_json?: Record<string, any>;
 }
 
 export interface TargetStatus {

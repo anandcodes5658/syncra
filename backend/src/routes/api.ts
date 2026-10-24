@@ -13,6 +13,8 @@ import { generateCaptions } from '../controllers/aiController.js';
 import { db } from '../db.js';
 import { config } from '../config/env.js';
 import { authMiddleware, getExpectedToken } from '../middleware/auth.js';
+import { TwitterScraperService } from '../services/TwitterScraperService.js';
+import { encryptToken } from '../services/encryption.js';
 
 const router = Router();
 
@@ -80,6 +82,58 @@ router.get('/oauth/twitter/callback', OAuthController.callbackTwitter);
 router.get('/accounts', OAuthController.listAccounts);
 router.post('/accounts/mock-connect', OAuthController.mockConnect);
 router.delete('/accounts/:id', OAuthController.disconnectAccount);
+router.post('/accounts/twitter/session-connect', async (req, res) => {
+  try {
+    const { cookies, username, password, email } = req.body;
+    if (!cookies && (!username || !password)) {
+      res.status(400).json({
+        success: false,
+        error: 'Please provide either browser session cookies (auth_token & ct0) or your Twitter username and password.'
+      });
+      return;
+    }
+
+    const testAccount: any = {
+      platform: 'twitter',
+      account_name: username ? `@${username}` : '@syncra__ai',
+      metadata_json: {
+        cookies: cookies ? encryptToken(cookies) : undefined,
+        username,
+        password: password ? encryptToken(password) : undefined,
+        email
+      }
+    };
+
+    const authResult = await TwitterScraperService.getAuthenticatedScraper(testAccount);
+    if (!authResult) {
+      res.status(400).json({
+        success: false,
+        error: 'Could not authenticate with Twitter. Please ensure credentials or cookies are valid.'
+      });
+      return;
+    }
+
+    const user = await db.getDefaultUser();
+    await db.saveConnectedAccount({
+      user_id: user.id,
+      platform: 'twitter',
+      account_name: `@${authResult.username}`,
+      external_account_id: authResult.username,
+      encrypted_access_token: encryptToken('scraper_session_active'),
+      status: 'connected',
+      scopes: 'tweet.read,tweet.write,users.read,media.write',
+      metadata_json: testAccount.metadata_json
+    });
+
+    res.json({
+      success: true,
+      accountName: `@${authResult.username}`,
+      message: `Connected @${authResult.username} via automated session! Free native video and image uploads are active.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Session connection error' });
+  }
+});
 
 // AI Captions
 router.post('/ai/generate-captions', generateCaptions);
@@ -120,8 +174,8 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     appName: 'Syncra Social Auto Poster',
-    version: '1.0.1',
-    build: '2026-10-23-twitter-pkce',
+    version: '1.0.2',
+    build: '2026-10-24-solution-a-native-twitter',
     timestamp: new Date().toISOString(),
     features: config.features,
     storageProvider: config.storage.provider

@@ -23,6 +23,9 @@ export interface ConnectedAccount {
   expires_at?: string;
   scopes?: string;
   status: 'connected' | 'expired' | 'disconnected';
+  metadata_json?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MediaAsset {

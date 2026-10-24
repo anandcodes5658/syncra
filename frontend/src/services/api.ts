@@ -233,6 +233,24 @@ export async function disconnectAccount(accountId: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to disconnect account');
 }
 
+export async function connectTwitterSession(payload: {
+  cookies?: string;
+  username?: string;
+  password?: string;
+  email?: string;
+}): Promise<{ success: boolean; accountName: string; message: string }> {
+  const res = await authFetch(`${API_BASE}/accounts/twitter/session-connect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to connect Twitter session');
+  }
+  return data;
+}
+
 export async function generateCaptions(masterCaption: string, tone = 'professional & engaging'): Promise<PlatformCaptions> {
   const res = await authFetch(`${API_BASE}/ai/generate-captions`, {
     method: 'POST',

@@ -9,10 +9,13 @@ import {
   ExternalLink,
   Sparkles,
   RefreshCw,
-  Loader2
+  Loader2,
+  Key,
+  X,
+  Info
 } from 'lucide-react';
 import { ConnectedAccount, PlatformType } from '../types';
-import { mockConnectAccount, disconnectAccount, getAuthToken } from '../services/api';
+import { mockConnectAccount, disconnectAccount, getAuthToken, connectTwitterSession } from '../services/api';
 
 interface Props {
   accounts: ConnectedAccount[];
@@ -23,6 +26,36 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Twitter Session Modal State (Solution A)
+  const [showTwitterSessionModal, setShowTwitterSessionModal] = useState(false);
+  const [sessionMode, setSessionMode] = useState<'cookies' | 'credentials'>('cookies');
+  const [cookieString, setCookieString] = useState('');
+  const [twUsername, setTwUsername] = useState('syncra__ai');
+  const [twPassword, setTwPassword] = useState('');
+  const [twEmail, setTwEmail] = useState('');
+  const [sessionSubmitting, setSessionSubmitting] = useState(false);
+
+  const handleConnectSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSessionSubmitting(true);
+    setMessage(null);
+    try {
+      const payload =
+        sessionMode === 'cookies'
+          ? { cookies: cookieString.trim() }
+          : { username: twUsername.trim(), password: twPassword, email: twEmail.trim() };
+
+      const res = await connectTwitterSession(payload);
+      setMessage({ type: 'success', text: res.message });
+      setShowTwitterSessionModal(false);
+      onRefreshAccounts();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to connect Twitter session' });
+    } finally {
+      setSessionSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -350,10 +383,172 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
                   </>
                 )}
               </div>
+
+              {/* Twitter Solution A Native Session Section */}
+              {platform.id === 'twitter' && (
+                <div className="pt-3 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="text-[11px] text-neutral-300 font-medium">Free Native Media (Video/Image):</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTwitterSessionModal(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl transition shadow-sm"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>
+                      {isConnected && account?.metadata_json?.auth_mode === 'scraper_session'
+                        ? 'Session Active (Free Media)'
+                        : 'Connect Free Session'}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* Twitter Session Modal (Solution A) */}
+      {showTwitterSessionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0a0a0a] border border-neutral-800 rounded-2xl w-full max-w-md p-6 space-y-5 text-left shadow-2xl relative">
+            <button
+              onClick={() => !sessionSubmitting && setShowTwitterSessionModal(false)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-black text-white border border-neutral-700 flex items-center justify-center font-bold text-xs">
+                  𝕏
+                </span>
+                <h3 className="text-base font-bold text-white tracking-tight">Connect Twitter Session</h3>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1">
+                Post full native videos & images directly to X without paying Developer API fees.
+              </p>
+            </div>
+
+            {/* Mode Tabs */}
+            <div className="flex items-center bg-neutral-900 p-1 rounded-xl border border-neutral-800 text-xs">
+              <button
+                type="button"
+                onClick={() => setSessionMode('cookies')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition ${
+                  sessionMode === 'cookies' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Browser Cookies (Zero Captcha)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionMode('credentials')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition ${
+                  sessionMode === 'credentials' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Username & Password
+              </button>
+            </div>
+
+            <form onSubmit={handleConnectSession} className="space-y-4">
+              {sessionMode === 'cookies' ? (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-neutral-300 uppercase tracking-wider block">
+                    Session Cookies (auth_token & ct0)
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={cookieString}
+                    onChange={(e) => setCookieString(e.target.value)}
+                    placeholder="auth_token=...; ct0=..."
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-white placeholder-neutral-600 font-mono focus:outline-none focus:border-white transition"
+                    required
+                  />
+                  <div className="p-2.5 bg-neutral-900/60 border border-neutral-800 rounded-xl text-[11px] text-neutral-400 space-y-1">
+                    <p className="font-semibold text-neutral-300 flex items-center gap-1">
+                      <Info className="w-3 h-3 text-sky-400" /> How to get your cookies in 15 seconds:
+                    </p>
+                    <p>1. Open <strong className="text-white">x.com</strong> in Chrome where you are logged in.</p>
+                    <p>2. Press <code className="text-white bg-black px-1 rounded">F12</code> &rarr; click <strong className="text-white">Application</strong> tab &rarr; <strong className="text-white">Cookies</strong> &rarr; <strong className="text-white">https://x.com</strong>.</p>
+                    <p>3. Copy values of <code className="text-emerald-400">auth_token</code> and <code className="text-emerald-400">ct0</code>.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-300 uppercase tracking-wider block">
+                      Twitter Username / Handle
+                    </label>
+                    <input
+                      type="text"
+                      value={twUsername}
+                      onChange={(e) => setTwUsername(e.target.value)}
+                      placeholder="syncra__ai"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-white transition"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-300 uppercase tracking-wider block">
+                      Twitter Password
+                    </label>
+                    <input
+                      type="password"
+                      value={twPassword}
+                      onChange={(e) => setTwPassword(e.target.value)}
+                      placeholder="Account password"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-white transition"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-neutral-300 uppercase tracking-wider block">
+                      Account Email (Optional, if prompted by security)
+                    </label>
+                    <input
+                      type="email"
+                      value={twEmail}
+                      onChange={(e) => setTwEmail(e.target.value)}
+                      placeholder="anandch5658@gmail.com"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-white transition"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTwitterSessionModal(false)}
+                  disabled={sessionSubmitting}
+                  className="px-3.5 py-1.5 text-xs text-neutral-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sessionSubmitting}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-black bg-white hover:bg-neutral-200 rounded-xl transition shadow disabled:opacity-50"
+                >
+                  {sessionSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Verifying Session...</span>
+                    </>
+                  ) : (
+                    <span>Save & Verify Session</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

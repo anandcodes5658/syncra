@@ -4,6 +4,7 @@ import { config } from '../../config/env.js';
 import { decryptToken, encryptToken } from '../encryption.js';
 import { db } from '../../db.js';
 import { StorageService } from '../storage.js';
+import { TwitterScraperService } from '../TwitterScraperService.js';
 
 export class TwitterPublisher extends BasePublisher {
   platformName = 'twitter';
@@ -12,10 +13,29 @@ export class TwitterPublisher extends BasePublisher {
     const { draft, target, media, account } = context;
     const tweetText = target.caption || draft.master_caption;
 
+    // 1. Solution A: Free Automated Native Media Upload via Scraper Session
+    if (TwitterScraperService.isConfigured(account)) {
+      console.log('[TwitterPublisher] Using Solution A (Native Scraper Video/Image Upload)...');
+      const localFilePath = media?.file_url ? StorageService.getLocalFilePath(media.file_url) : undefined;
+      const mimeType = media?.file_type;
+      const scraperRes = await TwitterScraperService.publishNativeMediaTweet({
+        text: tweetText,
+        mediaFilePath: localFilePath,
+        mimeType,
+        account
+      });
+
+      if (scraperRes.success) {
+        return scraperRes;
+      }
+      console.warn('[TwitterPublisher] Scraper publish error, checking fallbacks:', scraperRes.error);
+    }
+
+    // 2. Official Twitter API v2 (if enabled and funded)
     if (config.features.enableTwitterReal) {
       return this.publishReal(tweetText, media, account);
     } else {
-      // Default to Free 1-Click Web Intent bridge
+      // 3. Fallback: Free 1-Click Web Intent bridge (clean text without raw file URLs)
       return this.publishWebIntent(tweetText, media, account);
     }
   }
@@ -26,12 +46,8 @@ export class TwitterPublisher extends BasePublisher {
   private publishWebIntent(tweetText: string, media?: any, account?: any, reason?: string): PublishResult {
     const handle = account?.account_name?.replace('@', '') || 'syncra__ai';
     const params = new URLSearchParams();
+    // Clean text without raw mp4 URLs
     params.set('text', tweetText);
-
-    if (media?.file_url) {
-      const publicUrl = StorageService.getAbsolutePublicUrl(media.file_url);
-      params.set('url', publicUrl);
-    }
 
     const intentUrl = `https://twitter.com/intent/tweet?${params.toString()}`;
 
@@ -46,6 +62,7 @@ export class TwitterPublisher extends BasePublisher {
         intentUrl,
         text: tweetText,
         has_media: !!media,
+        media_url: media?.file_url ? StorageService.getAbsolutePublicUrl(media.file_url) : undefined,
         reason: reason || '1-Click Free Web Intent bridge',
         message: 'Free 1-Click Web Intent generated successfully. Click button to publish directly on X!'
       }
