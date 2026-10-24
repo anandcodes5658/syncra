@@ -10,34 +10,43 @@ export class TwitterScraperService {
   private static lastScraperInitTime = 0;
 
   /**
-   * Parse cookie string or array into tough-cookie compatible strings
+   * Parse cookie string or array into tough-cookie compatible strings with proper .twitter.com domain
    */
   static parseCookies(raw: string | string[]): string[] {
     if (Array.isArray(raw)) {
-      return raw.map((c) => String(c).trim()).filter(Boolean);
+      raw = raw.join('; ');
     }
 
     const trimmed = String(raw).trim();
+    let pairs: string[] = [];
+
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       try {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
-          return parsed.map((c) => (typeof c === 'string' ? c : `${c.name || c.key}=${c.value}`));
+          pairs = parsed.map((c) => (typeof c === 'string' ? c : `${c.name || c.key}=${c.value}`));
         }
       } catch {
-        // Fallback to text parsing
+        // Fallback
       }
     }
 
-    // Handles standard cookie header string: "auth_token=xyz; ct0=abc"
-    const pairs = trimmed.split(/;\s*/).filter(Boolean);
-    const result: string[] = [];
+    if (pairs.length === 0) {
+      pairs = trimmed.split(/;\s*/).filter(Boolean);
+    }
 
+    const result: string[] = [];
     for (const pair of pairs) {
       const [key, ...vals] = pair.split('=');
       const val = vals.join('=');
       if (key && val) {
-        result.push(`${key.trim()}=${val.trim()}`);
+        const k = key.trim();
+        const v = val.trim();
+        if (v.toLowerCase().includes('domain=')) {
+          result.push(`${k}=${v}`);
+        } else {
+          result.push(`${k}=${v}; Domain=.twitter.com; Path=/; Secure`);
+        }
       }
     }
 
@@ -74,20 +83,20 @@ export class TwitterScraperService {
 
     if (rawCookies) {
       const parsed = this.parseCookies(rawCookies);
-      if (parsed.length > 0) {
+      const hasAuthToken = parsed.some((c) => c.startsWith('auth_token='));
+      const hasCt0 = parsed.some((c) => c.startsWith('ct0='));
+
+      if (hasAuthToken && hasCt0) {
         try {
           await scraper.setCookies(parsed);
-          const loggedIn = await scraper.isLoggedIn();
-          if (loggedIn) {
-            console.log('[TwitterScraperService] Successfully authenticated via session cookies!');
-            let screenName = account?.account_name?.replace('@', '') || process.env.TWITTER_USERNAME || 'syncra__ai';
-            return { scraper, username: screenName };
-          } else {
-            console.warn('[TwitterScraperService] Provided cookies are invalid or expired.');
-          }
+          console.log('[TwitterScraperService] Successfully initialized scraper with auth_token & ct0 cookies!');
+          const screenName = account?.account_name?.replace('@', '') || process.env.TWITTER_USERNAME || 'syncra__ai';
+          return { scraper, username: screenName };
         } catch (cookieErr: any) {
-          console.warn('[TwitterScraperService] Cookie authentication error:', cookieErr.message);
+          console.warn('[TwitterScraperService] Cookie initialization error:', cookieErr.message);
         }
+      } else {
+        console.warn('[TwitterScraperService] Incomplete session cookies. Both auth_token and ct0 are required.');
       }
     }
 

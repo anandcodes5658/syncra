@@ -35,11 +35,12 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
   const [twPassword, setTwPassword] = useState('');
   const [twEmail, setTwEmail] = useState('');
   const [sessionSubmitting, setSessionSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const handleConnectSession = async (e: React.FormEvent) => {
     e.preventDefault();
     setSessionSubmitting(true);
-    setMessage(null);
+    setModalError(null);
     try {
       const payload =
         sessionMode === 'cookies'
@@ -49,9 +50,10 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
       const res = await connectTwitterSession(payload);
       setMessage({ type: 'success', text: res.message });
       setShowTwitterSessionModal(false);
+      setModalError(null);
       onRefreshAccounts();
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to connect Twitter session' });
+      setModalError(err.message || 'Failed to connect Twitter session');
     } finally {
       setSessionSubmitting(false);
     }
@@ -437,7 +439,10 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
             <div className="flex items-center bg-neutral-900 p-1 rounded-xl border border-neutral-800 text-xs">
               <button
                 type="button"
-                onClick={() => setSessionMode('cookies')}
+                onClick={() => {
+                  setSessionMode('cookies');
+                  setModalError(null);
+                }}
                 className={`flex-1 py-1.5 rounded-lg font-medium transition ${
                   sessionMode === 'cookies' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'
                 }`}
@@ -446,7 +451,10 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
               </button>
               <button
                 type="button"
-                onClick={() => setSessionMode('credentials')}
+                onClick={() => {
+                  setSessionMode('credentials');
+                  setModalError(null);
+                }}
                 className={`flex-1 py-1.5 rounded-lg font-medium transition ${
                   sessionMode === 'credentials' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'
                 }`}
@@ -518,6 +526,13 @@ export const ConnectAccountsPage: React.FC<Props> = ({ accounts, onRefreshAccoun
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-white transition"
                     />
                   </div>
+                </div>
+              )}
+
+              {modalError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-xs text-rose-300">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <span className="leading-relaxed">{modalError}</span>
                 </div>
               )}
 

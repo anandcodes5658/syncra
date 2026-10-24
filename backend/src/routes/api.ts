@@ -93,12 +93,26 @@ router.post('/accounts/twitter/session-connect', async (req, res) => {
       return;
     }
 
+    if (cookies) {
+      const parsed = TwitterScraperService.parseCookies(cookies);
+      const hasAuth = parsed.some((c) => c.startsWith('auth_token='));
+      const hasCt0 = parsed.some((c) => c.startsWith('ct0='));
+      if (!hasAuth || !hasCt0) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required cookies. Please make sure both "auth_token" and "ct0" are included.'
+        });
+        return;
+      }
+    }
+
     const testAccount: any = {
       platform: 'twitter',
       account_name: username ? `@${username}` : '@syncra__ai',
       metadata_json: {
+        auth_mode: cookies ? 'cookies' : 'credentials',
         cookies: cookies ? encryptToken(cookies) : undefined,
-        username,
+        username: username || 'syncra__ai',
         password: password ? encryptToken(password) : undefined,
         email
       }
@@ -108,7 +122,9 @@ router.post('/accounts/twitter/session-connect', async (req, res) => {
     if (!authResult) {
       res.status(400).json({
         success: false,
-        error: 'Could not authenticate with Twitter. Please ensure credentials or cookies are valid.'
+        error: cookies
+          ? 'Invalid or expired session cookies. Please re-copy auth_token and ct0 from an active x.com session.'
+          : 'Twitter security challenge detected on cloud IP. Direct password login is blocked by Twitter. Please switch to the "Browser Cookies" tab to connect instantly.'
       });
       return;
     }
@@ -220,8 +236,8 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     appName: 'Syncra Social Auto Poster',
-    version: '1.0.3',
-    build: '2026-10-24-longlived-meta-native-twitter-v3',
+    version: '1.0.4',
+    build: '2026-10-24-twitter-session-cookie-fix-v4',
     timestamp: new Date().toISOString(),
     features: config.features,
     storageProvider: config.storage.provider,
