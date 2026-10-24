@@ -77,16 +77,35 @@ export class OAuthController {
 
       const accessToken = tokenRes.data.access_token;
 
-      // Fetch user profile
-      const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${accessToken}`);
+      // 1. Exchange short-lived User Token for a 60-day Long-Lived User Token
+      let effectiveUserToken = accessToken;
+      try {
+        const longTokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+          params: {
+            grant_type: 'fb_exchange_token',
+            client_id: config.meta.appId,
+            client_secret: config.meta.appSecret,
+            fb_exchange_token: accessToken
+          }
+        });
+        if (longTokenRes.data?.access_token) {
+          effectiveUserToken = longTokenRes.data.access_token;
+          console.log('[OAuthController] Successfully acquired 60-day long-lived Meta token!');
+        }
+      } catch (errLong: any) {
+        console.warn('[OAuthController] Failed to exchange for long-lived Meta token:', errLong.response?.data || errLong.message);
+      }
+
+      // Fetch user profile with long-lived token
+      const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${effectiveUserToken}`);
       const user = await db.getDefaultUser();
 
-      // Fetch Facebook Pages managed by user (Tier 1: /me/accounts)
+      // Fetch Facebook Pages managed by user (Tier 1: /me/accounts with long-lived token generates permanent page tokens)
       let pages: any[] = [];
       let accountsDebug: any = null;
       try {
         const accountsRes = await axios.get(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,category,instagram_business_account{id,username,name}&access_token=${accessToken}`
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,category,instagram_business_account{id,username,name}&access_token=${effectiveUserToken}`
         );
         accountsDebug = accountsRes.data;
         pages = accountsRes.data.data || [];
@@ -99,7 +118,7 @@ export class OAuthController {
       if (pages.length === 0) {
         try {
           const busRes = await axios.get(
-            `https://graph.facebook.com/v19.0/me/businesses?fields=id,name,client_pages{id,name,access_token,instagram_business_account{id,username,name}},owned_pages{id,name,access_token,instagram_business_account{id,username,name}}&access_token=${accessToken}`
+            `https://graph.facebook.com/v19.0/me/businesses?fields=id,name,client_pages{id,name,access_token,instagram_business_account{id,username,name}},owned_pages{id,name,access_token,instagram_business_account{id,username,name}}&access_token=${effectiveUserToken}`
           );
           if (busRes.data?.data) {
             for (const b of busRes.data.data) {
@@ -121,7 +140,7 @@ export class OAuthController {
       if (pages.length === 0) {
         try {
           const directPageRes = await axios.get(
-            `https://graph.facebook.com/v19.0/me?fields=id,name,category,instagram_business_account{id,username,name}&access_token=${accessToken}`
+            `https://graph.facebook.com/v19.0/me?fields=id,name,category,instagram_business_account{id,username,name}&access_token=${effectiveUserToken}`
           );
           directPageData = directPageRes.data;
           // If category exists or name matches, user authorized directly in Page profile context
@@ -130,7 +149,7 @@ export class OAuthController {
             pages.push({
               id: directPageData.id,
               name: directPageData.name,
-              access_token: accessToken,
+              access_token: effectiveUserToken,
               instagram_business_account: directPageData.instagram_business_account
             });
           }
@@ -185,7 +204,7 @@ export class OAuthController {
         platform: 'facebook',
         account_name: primaryPage.name || 'Facebook Page',
         external_account_id: primaryPage.id,
-        encrypted_access_token: encryptToken(primaryPage.access_token || accessToken),
+        encrypted_access_token: encryptToken(primaryPage.access_token || effectiveUserToken),
         status: 'connected',
         scopes: 'pages_manage_posts,pages_read_engagement,pages_show_list'
       });
@@ -202,7 +221,7 @@ export class OAuthController {
             platform: 'instagram',
             account_name: `@${igUsername}`,
             external_account_id: igId,
-            encrypted_access_token: encryptToken(p.access_token || accessToken),
+            encrypted_access_token: encryptToken(p.access_token || effectiveUserToken),
             status: 'connected',
             scopes: 'instagram_content_publish,instagram_basic'
           });

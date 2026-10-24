@@ -135,6 +135,52 @@ router.post('/accounts/twitter/session-connect', async (req, res) => {
   }
 });
 
+router.post('/accounts/twitter/test-scraper', async (req, res) => {
+  try {
+    const user = await db.getDefaultUser();
+    const account = await db.getConnectedAccountByPlatform(user.id, 'twitter');
+    const isConfig = TwitterScraperService.isConfigured(account);
+
+    const diagnostics = {
+      isConfigured: isConfig,
+      hasEnvUsername: !!(process.env.TWITTER_USERNAME || config.twitter.username),
+      hasEnvPassword: !!(process.env.TWITTER_PASSWORD || config.twitter.password),
+      hasEnvEmail: !!(process.env.TWITTER_EMAIL || config.twitter.email),
+      hasEnvCookies: !!(process.env.TWITTER_COOKIES || config.twitter.cookies),
+      accountHasMetadata: !!account?.metadata_json,
+      accountAuthMode: account?.metadata_json?.auth_mode || null
+    };
+
+    if (!isConfig) {
+      res.json({
+        success: false,
+        diagnostics,
+        message: 'No Twitter session cookies or username/password found in Render environment or database.'
+      });
+      return;
+    }
+
+    const authResult = await TwitterScraperService.getAuthenticatedScraper(account);
+    if (!authResult) {
+      res.json({
+        success: false,
+        diagnostics,
+        message: 'Scraper attempted authentication but could not log in. Check credentials or use cookies.'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      diagnostics,
+      username: authResult.username,
+      message: `Twitter scraper successfully verified session as @${authResult.username}!`
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // AI Captions
 router.post('/ai/generate-captions', generateCaptions);
 
@@ -174,11 +220,18 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     appName: 'Syncra Social Auto Poster',
-    version: '1.0.2',
-    build: '2026-10-24-solution-a-native-twitter',
+    version: '1.0.3',
+    build: '2026-10-24-longlived-meta-native-twitter-v3',
     timestamp: new Date().toISOString(),
     features: config.features,
-    storageProvider: config.storage.provider
+    storageProvider: config.storage.provider,
+    twitterDiagnostics: {
+      hasTwitterCookiesEnv: !!(process.env.TWITTER_COOKIES || config.twitter.cookies),
+      hasTwitterUsernameEnv: !!(process.env.TWITTER_USERNAME || config.twitter.username),
+      hasTwitterPasswordEnv: !!(process.env.TWITTER_PASSWORD || config.twitter.password),
+      hasTwitterEmailEnv: !!(process.env.TWITTER_EMAIL || config.twitter.email),
+      enableTwitterReal: config.features.enableTwitterReal
+    }
   });
 });
 

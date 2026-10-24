@@ -36,11 +36,15 @@ export const config = {
     redirectUri: process.env.GOOGLE_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/google/callback`,
   },
 
-  // OAuth Twitter / X (API v2)
+  // OAuth Twitter / X (API v2) & Automated Native Scraper
   twitter: {
     clientId: process.env.TWITTER_CLIENT_ID || '',
     clientSecret: process.env.TWITTER_CLIENT_SECRET || '',
     redirectUri: process.env.TWITTER_REDIRECT_URI || `${defaultBaseUrl}/api/oauth/twitter/callback`,
+    username: process.env.TWITTER_USERNAME || '',
+    password: process.env.TWITTER_PASSWORD || '',
+    email: process.env.TWITTER_EMAIL || '',
+    cookies: process.env.TWITTER_COOKIES || ''
   },
 
   // Feature Flags
