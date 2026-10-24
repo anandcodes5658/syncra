@@ -29,6 +29,18 @@ export class TwitterPublisher extends BasePublisher {
         return scraperRes;
       }
       console.warn('[TwitterPublisher] Scraper publish error, checking fallbacks:', scraperRes.error);
+
+      // If user specifically configured a scraper session or cookies, do NOT fall back to OAuth API v2
+      // (because OAuth v2 doesn't have an OAuth 2.0 user access token and fails with 403 Unsupported Authentication)
+      const isSessionAuth =
+        account?.metadata_json?.auth_mode === 'cookies' ||
+        account?.metadata_json?.auth_mode === 'credentials' ||
+        account?.metadata_json?.cookies ||
+        (process.env.TWITTER_COOKIES && process.env.TWITTER_COOKIES.length > 10);
+
+      if (isSessionAuth) {
+        return scraperRes;
+      }
     }
 
     // 2. Official Twitter API v2 (if enabled and funded)

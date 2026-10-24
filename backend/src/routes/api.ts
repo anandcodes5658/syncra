@@ -236,8 +236,8 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     appName: 'Syncra Social Auto Poster',
-    version: '1.0.4',
-    build: '2026-10-24-twitter-session-cookie-fix-v4',
+    version: '1.0.5',
+    build: '2026-10-24-direct-graphql-chunked-twitter-v5',
     timestamp: new Date().toISOString(),
     features: config.features,
     storageProvider: config.storage.provider,
